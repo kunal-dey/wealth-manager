@@ -13,6 +13,7 @@ MAXIMUM_ALLOCATION = 450
 
 
 END_PROCESS = False
+DEBUG = False
 
 
 def allocation():
@@ -24,3 +25,22 @@ def set_allocation(max_allocation, max_stocks):
     global MAXIMUM_ALLOCATION, MAXIMUM_STOCKS
     MAXIMUM_ALLOCATION = max_allocation
     MAXIMUM_STOCKS = max_stocks
+
+
+def end_process():
+    """
+        function is used to end the process if price generator sends END PROCESS
+    :return:
+    """
+    global END_PROCESS
+    return END_PROCESS
+
+
+def set_end_process(value):
+    """
+        function is used to end the process if price generator sends END PROCESS
+    :param value:
+    :return:
+    """
+    global END_PROCESS
+    END_PROCESS = value
