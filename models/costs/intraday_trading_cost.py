@@ -23,7 +23,7 @@ class IntradayTransactionCost:
     def __post_init__(self):
         self._profit_or_loss = (self.selling_price - self.buying_price) * self.quantity
         turnover = (self.buying_price + self.selling_price) * self.quantity
-        self._brokerage_charges = self.turnover * (0.03 / 100) if self.turnover * (0.03 / 100) < 40 else 40
+        self._brokerage_charges = turnover * (0.03 / 100) if turnover * (0.03 / 100) < 40 else 40
 
         self._stt_total = (0.025 / 100) * self.selling_price * self.quantity
         self._net_transaction_charges = round((0.00345 / 100) * turnover, 2)

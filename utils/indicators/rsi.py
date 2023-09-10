@@ -1,6 +1,6 @@
 def calculate_rsi(data, window=14):
     """
-    Calculates relative strenthh index
+    Calculates relative strength index
     :param data: a dataframe with the column named as line
     :param window: period over which rsi is calculated
     :return:

@@ -7,7 +7,7 @@ from models.stock_info import StockInfo
 from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, allocation
+from constants.settings import END_TIME, SLEEP_INTERVAL, allocation, end_process
 
 logger: Logger = get_logger(__name__)
 
@@ -40,6 +40,9 @@ async def background_task():
             """
             for stock in account.stocks_to_track.keys():
                 account.stocks_to_track[stock].update_price()
+
+            if end_process():
+                break
 
         except:
             logger.exception("Kite error may have happened")

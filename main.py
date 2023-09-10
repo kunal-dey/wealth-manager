@@ -1,13 +1,14 @@
 from logging import Logger
 
-from quart import Quart, request
+from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
 
 from constants.global_contexts import set_access_token
-from services import background_task
+from services.background_task import background_task
 from constants.global_contexts import kite_context
 from utils.logger import get_logger
+from routes.stock_input import stocks_input
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -68,6 +69,11 @@ async def stop_background_tasks():
         task.cancel()
     logger.info("STOPPED ALL BACKGROUND SERVICES")
     return {"message": "All task cancelled"}
+
+resource_list: list[Blueprint] = [stocks_input]
+
+for resource in resource_list:
+    app.register_blueprint(blueprint=resource)
 
 
 if __name__ == "__main__":

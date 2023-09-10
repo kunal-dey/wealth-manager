@@ -38,4 +38,3 @@ class DeliveryTransactionCost:
     @property
     def net_pl(self):
         return self._profit_or_loss - self.total_tax_and_charges
-

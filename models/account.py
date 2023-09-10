@@ -7,4 +7,4 @@ from models.stock_info import StockInfo
 class Account:
     stocks_to_track: dict[str, StockInfo] = field(default_factory=dict)
 
-    
+

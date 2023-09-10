@@ -103,7 +103,6 @@ class StockInfo:
             self.__result_stock_df.drop(self.__result_stock_df.columns[0], axis=1, inplace=True)
         except FileNotFoundError:
             self.__result_stock_df = None
-        logger.info(f"{self.__result_stock_df}")
         stock_df = pd.DataFrame({"price": [current_price]})
         if self.__result_stock_df is not None:
             self.__result_stock_df = pd.concat([self.__result_stock_df, stock_df], ignore_index=True)

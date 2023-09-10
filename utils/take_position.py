@@ -27,7 +27,7 @@ def short(symbol: str, quantity: int, product_type: ProductType, exchange: str):
             validity=kite_context.VALIDITY_DAY
         )
         return True
-    except InputException as e:
+    except InputException:
         logger.exception("Error during selling")
         return False
 
@@ -51,6 +51,6 @@ def long(symbol: str, quantity: int, product_type: ProductType, exchange: str):
             validity=kite_context.VALIDITY_DAY
         )
         return True
-    except InputException as e:
+    except InputException:
         logger.exception("Error during buying")
         return False
