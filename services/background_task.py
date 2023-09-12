@@ -3,11 +3,13 @@ from asyncio import sleep
 from logging import Logger
 
 from models.account import Account
+from models.stages.holding import Holding
+from models.stages.position import Position
 from models.stock_info import StockInfo
 from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, allocation, end_process
+from constants.settings import END_TIME, SLEEP_INTERVAL, allocation, end_process, START_TIME, STOP_BUYING_TIME
 
 logger: Logger = get_logger(__name__)
 
@@ -44,6 +46,50 @@ async def background_task():
             if end_process():
                 break
 
+            """
+                if the time is within trading interval or certain criteria is met then buy stocks
+            """
+            if START_TIME < current_time < STOP_BUYING_TIME:
+                try:
+                    # if current_time > START_BUYING_TIME:
+                    account.buy_stocks()
+                except:
+                    pass
+
+            """
+                if the trigger for selling is breached in position then sell
+            """
+
+            positions_to_delete = []  # this is needed or else it will alter the length during loop
+
+            for position_name in account.positions.keys():
+                position: Position = account.positions[position_name]
+                if position.breached():
+                    logger.info(f" line 89 -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                    positions_to_delete.append(position_name)
+                    del account.stocks_to_track[position_name]
+                    # traced_stock_list.remove(position_name)
+
+            for position_name in positions_to_delete:
+                del account.positions[position_name]
+
+            """
+                if the trigger for selling is breached in holding then sell
+            """
+
+            holdings_to_delete = []  # this is needed or else it will alter the length during loop
+
+            for holding_name in account.holdings.keys():
+                holding: Holding = account.holdings[holding_name]
+
+                if START_TIME < current_time:
+                    if holding.breached():
+                        logger.info(f" line 89 -->sell {holding.stock.stock_name} at {holding.stock.latest_price}")
+                        holdings_to_delete.append(holding_name)
+                        del account.stocks_to_track[holding_name]
+
+            for holding_name in holdings_to_delete:
+                del account.holdings[holding_name]
         except:
             logger.exception("Kite error may have happened")
 

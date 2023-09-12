@@ -3,6 +3,7 @@ from kiteconnect.exceptions import InputException
 
 from constants.enums.product_type import ProductType
 from constants.global_contexts import kite_context
+from constants.settings import DEBUG
 
 from utils.logger import get_logger
 
@@ -15,6 +16,8 @@ def short(symbol: str, quantity: int, product_type: ProductType, exchange: str):
         1. sell the position which has already been bought, or
         2. sell a negative quantity of stocks
     """
+    if DEBUG:
+        return True
     try:
         kite_context.place_order(
             variety=kite_context.VARIETY_REGULAR,
@@ -38,7 +41,8 @@ def long(symbol: str, quantity: int, product_type: ProductType, exchange: str):
         1. buy the position which has already been short, or
         2. buy a positive quantity of stocks
     """
-
+    if DEBUG:
+        return True
     try:
         kite_context.place_order(
             variety=kite_context.VARIETY_REGULAR,

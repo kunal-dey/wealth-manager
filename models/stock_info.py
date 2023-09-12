@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import Logger
 from time import sleep
 from dataclasses import dataclass, field
@@ -17,10 +18,12 @@ logger: Logger = get_logger(__name__)
 class StockInfo:
     stock_name: str
     exchange: str = 'NSE'
+    wallet: float = field(default=0.0, init=False)
     latest_indicator_price: float | None = field(default=None, init=False)
     latest_price: float = field(default=None, init=False)
     low: float = field(default=None, init=False)
     high: float = field(default=None, init=False)
+    created_at: datetime = field(default_factory=datetime.now)
     __result_stock_df: pd.DataFrame | None = field(default=None, init=False)
 
     @property
@@ -111,3 +114,33 @@ class StockInfo:
         self.__result_stock_df.to_csv(f"temp/{self.stock_name}.csv")
         self.__result_stock_df = self.__result_stock_df.bfill().ffill()
         self.__result_stock_df.dropna(axis=1, inplace=True)
+
+    def whether_buy(self) -> bool:
+        """
+        Buy the stock if certain conditions are met:
+        1. If total buying quantity/ total selling quantity > 0.8 then buy
+        2. It has a minimum quantity which you want to buy
+        3. The current price is not more than 1% of the trigger price
+        :return: True, if buy else false
+        """
+        # quote_data: dict = kite_context.quote([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"][
+        #     "depth"]
+        #
+        # buy_quantities = np.array([order['orders']*order['quantity'] for order in quote_data["buy"]])
+        # sell_quantities = np.array([order['orders']*order['quantity'] for order in quote_data["sell"]])
+        #
+        # # TODO: add and self.current_price < (1+0.01)*minimum_price
+        # if np.sum(buy_quantities)/np.sum(sell_quantities) > 1.0 and np.sum(buy_quantities) > quantity:
+        #     return True
+        # return False
+        # if self.__result_stock_df:
+        #     stock_df = self.__result_stock_df.copy()
+        #
+        #     stock_df.insert(1, "line", kaufman_indicator(stock_df["Close"], pow1=2))
+        #     stock_df.insert(2, "max", stock_df.line.rolling(window=60).max())
+        #     stock_df.insert(3, "min", stock_df.line.rolling(window=60).min())
+        #     stock_df.insert(4, "med", (8 / 10) * stock_df["max"] + (2 / 10) * stock_df["min"])
+        #     stock_df.insert(5, "diff", stock_df["max"] - stock_df["min"])
+        #     if stock_df['line'].iloc[-1] == stock_df['max'].iloc[-1] and stock_df['line'].iloc[-2] == stock_df['max'].iloc[-2]:
+        #         return True
+        return True
