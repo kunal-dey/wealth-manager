@@ -89,7 +89,10 @@ async def background_task():
                         del account.stocks_to_track[holding_name]
 
             for holding_name in holdings_to_delete:
+                account.holdings[holding_name]
                 del account.holdings[holding_name]
+
+
         except:
             logger.exception("Kite error may have happened")
 

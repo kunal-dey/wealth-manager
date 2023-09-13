@@ -5,10 +5,16 @@ from quart_cors import cors
 from kiteconnect.exceptions import InputException
 
 from constants.global_contexts import set_access_token
+from models.db_models import find_by_name, retrieve_all_services
 from services.background_task import background_task
 from constants.global_contexts import kite_context
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
+
+from models.stages.holding import Holding
+from models.stock_info import StockInfo
+from constants.enums.position_type import PositionType
+from constants.enums.product_type import ProductType
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -74,6 +80,41 @@ resource_list: list[Blueprint] = [stocks_input]
 
 for resource in resource_list:
     app.register_blueprint(blueprint=resource)
+
+
+@app.get("/hit")
+async def save():
+    # stock_info = StockInfo(
+    #     stock_name="INFY",
+    # )
+    # holding = Holding(
+    #     buy_price=100,
+    #     position_price=101,
+    #     quantity=4,
+    #     product_type=ProductType.DELIVERY,
+    #     position_type=PositionType.LONG,
+    #     stock=stock_info
+    # )
+    # await holding.save_to_db()
+    # stock_info = StockInfo(
+    #     stock_name="TCS",
+    # )
+    # holding = Holding(
+    #     buy_price=200,
+    #     position_price=201,
+    #     quantity=34,
+    #     product_type=ProductType.DELIVERY,
+    #     position_type=PositionType.LONG,
+    #     stock=stock_info
+    # )
+    # await holding.save_to_db()
+    # holding.quantity = 37
+    # holding.product_type = ProductType.INTRADAY
+    # await holding.update_in_db()
+    # holding:Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "INFY"})
+    # await holding.delete_from_db()
+    # print(await retrieve_all_services(Holding.COLLECTION, Holding))
+    return {"msg":"saved"}
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from logging import Logger
 
 from constants.enums.position_type import PositionType
@@ -44,5 +44,8 @@ class Account:
                             quantity=int(quantity),
                             product_type=ProductType.DELIVERY
                         )
+
+
+
 
 
