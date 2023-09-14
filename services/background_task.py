@@ -1,6 +1,7 @@
 from datetime import datetime
 from asyncio import sleep
 from logging import Logger
+import yfinance as yf
 
 from models.account import Account
 from models.stages.holding import Holding
@@ -9,7 +10,10 @@ from models.stock_info import StockInfo
 from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, allocation, end_process, START_TIME, STOP_BUYING_TIME
+from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, STOP_BUYING_TIME, \
+    set_allocation, get_max_stocks, set_max_stocks
+from utils.tracking_components.stock_tracking import filter_stocks
+from utils.tracking_components.verify_symbols import get_correct_symbol
 
 logger: Logger = get_logger(__name__)
 
@@ -26,20 +30,43 @@ async def background_task():
 
     account: Account = Account()
 
+    prediction_df, obtained_stock_list = None, await get_correct_symbol()
+
+    not_loaded = True
+    filtered_stocks = []
+
+    """
+    START OF DAY ACTIVITIES
+    """
+
     # this part will loop till the trading times end
     while current_time < END_TIME:
         await sleep(SLEEP_INTERVAL)
 
+        current_time = datetime.now()
+
         try:
+            if not_loaded and current_time >= START_TIME:
+                trackable_stocks = filter_stocks(obtained_stock_list)
+                filtered_stocks = [i[:-3] for i in trackable_stocks]
+                prediction_df = yf.download(tickers=trackable_stocks, period='1wk', interval='1m', show_errors=False)['Close']
+                set_allocation(30000 / len(filtered_stocks))
+                set_max_stocks(len(filtered_stocks))
+
+                logger.info(f"list of stocks: {filtered_stocks}")
+                logger.info(f"allocation: {get_allocation()}")
+                not_loaded = False
+
             """
                 if any new stock is added then it will be added in the stock to track
             """
             for chosen_stock in chosen_stocks():
-                if chosen_stock not in list(account.stocks_to_track.keys()) and len(account.stocks_to_track) < allocation():
+                if chosen_stock not in list(account.stocks_to_track.keys()) and len(account.stocks_to_track) < get_allocation():
                     account.stocks_to_track[chosen_stock] = StockInfo(chosen_stock, 'NSE')
             """
                 update price for all the stocks which are being tracked
             """
+            logger.info(f"{account.stocks_to_track}")
             for stock in account.stocks_to_track.keys():
                 account.stocks_to_track[stock].update_price()
 
@@ -56,6 +83,15 @@ async def background_task():
                 except:
                     pass
 
+                for stock_col in filtered_stocks:
+                    if len(account.stocks_to_track) < get_max_stocks():
+                        account.stocks_to_track[stock_col] = StockInfo(stock_col, 'NSE')
+                        stock_df = prediction_df[[f"{stock_col}.NS"]]
+                        stock_df.reset_index(inplace=True)
+                        stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                        stock_df.columns = ['price']
+                        stock_df.to_csv(f"temp/{stock_col}.csv")
+
             """
                 if the trigger for selling is breached in position then sell
             """
@@ -68,7 +104,7 @@ async def background_task():
                     logger.info(f" line 89 -->sell {position.stock.stock_name} at {position.stock.latest_price}")
                     positions_to_delete.append(position_name)
                     del account.stocks_to_track[position_name]
-                    # traced_stock_list.remove(position_name)
+                    filtered_stocks.remove(position_name)
 
             for position_name in positions_to_delete:
                 del account.positions[position_name]
@@ -89,11 +125,14 @@ async def background_task():
                         del account.stocks_to_track[holding_name]
 
             for holding_name in holdings_to_delete:
-                account.holdings[holding_name]
                 del account.holdings[holding_name]
 
 
         except:
             logger.exception("Kite error may have happened")
+
+    """
+    END OF DAY ACTIVITIES
+    """
 
     logger.info("TASK ENDED")

@@ -34,14 +34,23 @@ MAXIMUM_ALLOCATION = 450
 END_PROCESS = False
 
 
-def allocation():
+def get_allocation():
     global MAXIMUM_ALLOCATION
     return MAXIMUM_ALLOCATION
 
 
-def set_allocation(max_allocation, max_stocks):
-    global MAXIMUM_ALLOCATION, MAXIMUM_STOCKS
+def set_allocation(max_allocation):
+    global MAXIMUM_ALLOCATION
     MAXIMUM_ALLOCATION = max_allocation
+
+
+def get_max_stocks():
+    global MAXIMUM_STOCKS
+    return MAXIMUM_STOCKS
+
+
+def set_max_stocks(max_stocks):
+    global MAXIMUM_STOCKS
     MAXIMUM_STOCKS = max_stocks
 
 

@@ -44,8 +44,3 @@ class Account:
                             quantity=int(quantity),
                             product_type=ProductType.DELIVERY
                         )
-
-
-
-
-
