@@ -11,7 +11,7 @@ from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, STOP_BUYING_TIME, \
-    set_allocation, get_max_stocks, set_max_stocks
+    set_allocation, get_max_stocks, set_max_stocks, DEBUG
 from utils.tracking_components.stock_tracking import filter_stocks
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -66,9 +66,12 @@ async def background_task():
             """
                 update price for all the stocks which are being tracked
             """
-            logger.info(f"{account.stocks_to_track}")
+
             for stock in account.stocks_to_track.keys():
                 account.stocks_to_track[stock].update_price()
+                # because the instance of the stock stored in position is not the same stored in stocks_to_track
+                if stock in account.positions.keys():
+                    account.positions[stock].stock = account.stocks_to_track[stock]
 
             if end_process():
                 break
@@ -76,6 +79,7 @@ async def background_task():
             """
                 if the time is within trading interval or certain criteria is met then buy stocks
             """
+
             if START_TIME < current_time < STOP_BUYING_TIME:
                 try:
                     # if current_time > START_BUYING_TIME:
@@ -84,13 +88,24 @@ async def background_task():
                     pass
 
                 for stock_col in filtered_stocks:
-                    if len(account.stocks_to_track) < get_max_stocks():
+                    if len(account.stocks_to_track) < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
                         account.stocks_to_track[stock_col] = StockInfo(stock_col, 'NSE')
-                        stock_df = prediction_df[[f"{stock_col}.NS"]]
-                        stock_df.reset_index(inplace=True)
-                        stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
-                        stock_df.columns = ['price']
-                        stock_df.to_csv(f"temp/{stock_col}.csv")
+                        if not DEBUG:
+
+                            sell_orders: list = account.stocks_to_track[stock_col].get_quote["sell"]
+                            zero_quantity = True
+                            for item in sell_orders:
+                                if item['quantity'] > 0:
+                                    zero_quantity = False
+                                break
+                            if zero_quantity:
+                                continue
+                        _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                        # stock_df = prediction_df[[f"{stock_col}.NS"]]
+                        # stock_df.reset_index(inplace=True)
+                        # stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                        # stock_df.columns = ['price']
+                        # stock_df.to_csv(f"temp/{stock_col}.csv")
 
             """
                 if the trigger for selling is breached in position then sell
@@ -100,11 +115,24 @@ async def background_task():
 
             for position_name in account.positions.keys():
                 position: Position = account.positions[position_name]
-                if position.breached():
-                    logger.info(f" line 89 -->sell {position.stock.stock_name} at {position.stock.latest_price}")
-                    positions_to_delete.append(position_name)
-                    del account.stocks_to_track[position_name]
-                    filtered_stocks.remove(position_name)
+                status = position.breached()
+                match status:
+                    case "DAY1BREACHED":
+                        logger.info(f" DAY1BREACHED -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                        positions_to_delete.append(position_name)
+                        logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                        del account.stocks_to_track[position_name]  # delete from stocks to track
+                        filtered_stocks.remove(position_name)
+                    case "DAY1NOT":
+                        logger.info(f" DAY1NOT -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                        account.stocks_to_track[position_name].in_position = False
+                        positions_to_delete.append(position_name)
+
+                # if position.breached():
+                #     logger.info(f" line 89 -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                #     positions_to_delete.append(position_name)
+                #     del account.stocks_to_track[position_name]
+                #     filtered_stocks.remove(position_name)
 
             for position_name in positions_to_delete:
                 del account.positions[position_name]
@@ -130,6 +158,9 @@ async def background_task():
 
         except:
             logger.exception("Kite error may have happened")
+
+    wallet_list = {st: account.stocks_to_track[st].wallet for st in account.stocks_to_track.keys()}
+    logger.info(f" remaining stocks wallet : {wallet_list}")
 
     """
     END OF DAY ACTIVITIES

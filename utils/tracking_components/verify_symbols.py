@@ -7,14 +7,16 @@ import pandas as pd
 from constants.global_contexts import kite_context
 
 
-async def get_correct_symbol(lower_price=100, higher_price=400):
+async def get_correct_symbol(lower_price=0, higher_price=400, initial_stock_list=None):
     """
     Some symbol is trade to trade basis so-BE is attached at the end
+    :param initial_stock_list: None
     :param lower_price: lowest price above which the stocks are chosen
     :param higher_price: maximum price below which the stocks are chosen
     :return: a list of symbols in correct_format e.g. ['20MICRONS-BE', 'RELIANCE']
     """
-    initial_stock_list = pd.read_csv(getcwd() + "/temp/EQUITY_NSE.csv")[['Symbol']]
+    if initial_stock_list is None:
+        initial_stock_list = pd.read_csv(getcwd() + "/temp/EQUITY_NSE.csv")[['Symbol']]
 
     async def get_stocks(sub_list_of_stocks: list):
         """

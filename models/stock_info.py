@@ -3,12 +3,13 @@ from logging import Logger
 from time import sleep
 from dataclasses import dataclass, field
 from typing import Callable
+import numpy as np
 
 import requests
 import pandas as pd
 
 from constants.global_contexts import kite_context
-from constants.settings import DEBUG, set_end_process
+from constants.settings import DEBUG, set_end_process, get_allocation
 from models.db_models import get_save_to_db, get_delete_from_db, get_update_in_db
 from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
@@ -21,7 +22,8 @@ def get_schema():
         "stock_name": "str",
         "exchange": "str",
         "wallet": "float",
-        "created_at": "datetime"
+        "created_at": "datetime",
+        "first_load": "bool"
     }
 
 
@@ -42,11 +44,20 @@ class StockInfo:
     save_to_db: Callable = field(default=None, init=False)
     delete_from_db: Callable = field(default=None, init=False)
     update_in_db: Callable = field(default=None, init=False)
+    quantity: int = field(default=0, init=False)
+    first_load: bool = field(default=True)  # while loading from db make it true
+    in_position: bool = field(default=False)
+    last_buy_price: float = field(default=None)
 
     def __post_init__(self):
         self.save_to_db = get_save_to_db(self.COLLECTION, self)
         self.delete_from_db = get_delete_from_db(self.COLLECTION, self)
         self.update_in_db = get_update_in_db(self.COLLECTION, self)
+
+    @property
+    def get_quote(self):
+        return kite_context.quote([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"][
+                    "depth"]
 
     @property
     def current_price(self):
@@ -62,9 +73,20 @@ class StockInfo:
                     response = requests.get(f"http://127.0.0.1:8082/price?symbol={self.stock_name}")
                     return response.json()['data']
                 else:
-                    current_price = kite_context.ltp([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"]["last_price"]
-                    if current_price is not None:
-                        return float(current_price)
+                    quote: dict = self.get_quote
+                    if self.in_position:
+                        orders: list = quote["buy"]
+                    else:
+                        orders: list = quote["sell"]
+                    accumulated, quantity = 0, 0
+                    for item in orders:
+                        for order_no in range(1, item["orders"] + 1):
+                            for _ in range(1, item["quantity"] + 1):
+                                if quantity + 1 > self.quantity:
+                                    return accumulated / quantity
+                                accumulated += item["price"]
+                                quantity += 1
+                    return None
 
             except:
                 sleep(1)
@@ -89,14 +111,16 @@ class StockInfo:
         # if the current price is still none in that case, the older the latest price is used if it's not None
         if current_price is not None:
             self.latest_price = current_price
-        logger.info(f"{self.stock_name} : {self.latest_price}")
         if self.latest_price is not None:
 
             self.update_stock_df(self.latest_price)
             actual_price: pd.DataFrame = self.__result_stock_df.copy()
-            kuafman_array = kaufman_indicator(actual_price['price'])
-            actual_price.loc[:, 'line'] = kuafman_array
-            actual_price.loc[:, 'signal'] = actual_price.line.ewm(span=10).mean()
+            actual_price.insert(1, "min", actual_price.price.cummin())
+            if actual_price.shape[0] > 1:  # first value is the buy price only so from 2nd low value is taken for triggering in a single day
+                self.low = actual_price['min'].iloc[-1]
+
+            actual_price.loc[:, 'line'] = kaufman_indicator(actual_price['price'])
+            actual_price.loc[:, 'signal'] = actual_price.line.ewm(span=5).mean()
             actual_price.dropna(inplace=True)
             actual_price.reset_index(inplace=True)
             if actual_price.shape[0] == 0:
@@ -105,17 +129,29 @@ class StockInfo:
                 recent_price = actual_price.signal.iloc[actual_price.shape[0] - 1]
                 self.latest_indicator_price = recent_price
 
-            if self.low is None:
-                self.low = self.latest_price
-            else:
-                if self.low > self.latest_price:
-                    self.low = self.latest_price
+    def buy_parameters(self):
+        amount: float = get_allocation()
 
-            if self.high is None:
-                self.high = self.latest_price
+        def get_quantity_and_price(s_orders):
+            accumulated, quantity = 0, 0
+            for item in s_orders:
+                for order_no in range(1, item["orders"] + 1):
+                    for _ in range(1, item["quantity"] + 1):
+                        if accumulated + item["price"] > amount:
+                            return quantity, accumulated/quantity
+                        accumulated += item["price"]
+                        quantity += 1
+            return quantity, accumulated / quantity
+        quote: dict = self.get_quote
+        sell_orders: list = quote["sell"]
+        if DEBUG:
+            if self.latest_price:
+                self.quantity, price = int(amount/self.latest_price), self.latest_price
             else:
-                if self.high < self.latest_price:
-                    self.high = self.latest_price
+                self.quantity, price = 0, 0
+        else:
+            self.quantity, price = get_quantity_and_price(sell_orders)
+        return self.quantity, price
 
     def update_stock_df(self, current_price: float):
         """
@@ -133,6 +169,7 @@ class StockInfo:
             self.__result_stock_df = pd.concat([self.__result_stock_df, stock_df], ignore_index=True)
         else:
             self.__result_stock_df = stock_df
+        # logger.info(f"{self.stock_name} : {self.__result_stock_df.shape[0]} , {current_price}")
         self.__result_stock_df.to_csv(f"temp/{self.stock_name}.csv")
         self.__result_stock_df = self.__result_stock_df.bfill().ffill()
         self.__result_stock_df.dropna(axis=1, inplace=True)
@@ -145,24 +182,25 @@ class StockInfo:
         3. The current price is not more than 1% of the trigger price
         :return: True, if buy else false
         """
-        # quote_data: dict = kite_context.quote([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"][
-        #     "depth"]
-        #
-        # buy_quantities = np.array([order['orders']*order['quantity'] for order in quote_data["buy"]])
-        # sell_quantities = np.array([order['orders']*order['quantity'] for order in quote_data["sell"]])
-        #
-        # # TODO: add and self.current_price < (1+0.01)*minimum_price
-        # if np.sum(buy_quantities)/np.sum(sell_quantities) > 1.0 and np.sum(buy_quantities) > quantity:
-        #     return True
-        # return False
-        # if self.__result_stock_df:
-        #     stock_df = self.__result_stock_df.copy()
-        #
-        #     stock_df.insert(1, "line", kaufman_indicator(stock_df["Close"], pow1=2))
-        #     stock_df.insert(2, "max", stock_df.line.rolling(window=60).max())
-        #     stock_df.insert(3, "min", stock_df.line.rolling(window=60).min())
-        #     stock_df.insert(4, "med", (8 / 10) * stock_df["max"] + (2 / 10) * stock_df["min"])
-        #     stock_df.insert(5, "diff", stock_df["max"] - stock_df["min"])
-        #     if stock_df['line'].iloc[-1] == stock_df['max'].iloc[-1] and stock_df['line'].iloc[-2] == stock_df['max'].iloc[-2]:
-        #         return True
-        return True
+        if self.first_load:
+            # self.first_load = False  # or else it will constantly sell and buy
+            return True
+        else:
+            if self.__result_stock_df.shape[0] > 10:
+                stock_df = self.__result_stock_df.copy()
+                stock_df.insert(1, "line", kaufman_indicator(stock_df['price']))
+                stock_df.insert(2, "signal", stock_df.line.ewm(span=5).mean())
+                stock_df.insert(3, "min", stock_df.signal.cummin())
+                stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']*1.002), 1, 0)
+                # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
+                if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0 and self.last_buy_price > (1+0.02)*self.latest_price:
+                    return True
+            elif self.__result_stock_df.shape[0] > 1:
+                stock_df = self.__result_stock_df.copy()
+                stock_df.insert(1, "signal", stock_df.price.ewm(span=5).mean())
+                stock_df.insert(2, "min", stock_df.signal.cummin())
+                stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']), 1, 0)
+                # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
+                if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0:
+                    return True
+        return False

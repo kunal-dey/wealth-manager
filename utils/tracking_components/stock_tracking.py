@@ -12,7 +12,7 @@ def filter_stocks(obtained_stock_list):
             initial_stock_list.append(symbol)
 
     monthly_data = yf.download(tickers=[f"{stock}.NS" for stock in initial_stock_list], period='1y', interval='1d',
-                               show_errors=False)['Close']
+                               show_errors=False)['Open']
 
     monthly_data = monthly_data.bfill().ffill()
     monthly_data = monthly_data.dropna(axis=1)
@@ -33,22 +33,26 @@ def filter_stocks(obtained_stock_list):
         for index in range(check.shape[0]):
             if index > 1:
                 if check.iloc[index] and check.iloc[index - 1] == False:
-                    if datetime.now().weekday() > 0:
+                    if 6 > datetime.now().weekday() > 0:
                         if (datetime.now() - check.index[index]).days < 2:
+                            final_stock_list.append(stock_name)
+                    # used for testing on sundays
+                    elif datetime.now().weekday() == 6:
+                        if (datetime.now() - check.index[index]).days < 3:
                             final_stock_list.append(stock_name)
                     else:
                         if (datetime.now() - check.index[index]).days < 4:
                             final_stock_list.append(stock_name)
         # touching the minimum line and then increasing
-        check = (rsi_stock["line"] == rsi_stock["min"])
-        for index in range(check.shape[0]):
-            if index > 1:
-                if (check.iloc[index - 1] or check.iloc[index - 2]) and check.iloc[index] == False:
-                    if datetime.now().weekday() > 0:
-                        if (datetime.now() - check.index[index]).days < 2:
-                            final_stock_list.append(stock_name)
-                    else:
-                        if (datetime.now() - check.index[index]).days < 4:
-                            final_stock_list.append(stock_name)
+        # check = (rsi_stock["line"] == rsi_stock["min"])
+        # for index in range(check.shape[0]):
+        #     if index > 1:
+        #         if (check.iloc[index - 1] or check.iloc[index - 2]) and check.iloc[index] == False:
+        #             if datetime.now().weekday() > 0:
+        #                 if (datetime.now() - check.index[index]).days < 2:
+        #                     final_stock_list.append(stock_name)
+        #             else:
+        #                 if (datetime.now() - check.index[index]).days < 4:
+        #                     final_stock_list.append(stock_name)
 
     return list(set(final_stock_list))

@@ -5,16 +5,13 @@ from quart_cors import cors
 from kiteconnect.exceptions import InputException
 
 from constants.global_contexts import set_access_token
-from models.db_models import find_by_name, retrieve_all_services
+
 from services.background_task import background_task
 from constants.global_contexts import kite_context
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
 
-from models.stages.holding import Holding
-from models.stock_info import StockInfo
-from constants.enums.position_type import PositionType
-from constants.enums.product_type import ProductType
+from utils.tracking_components.verify_symbols import get_correct_symbol
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -114,6 +111,7 @@ async def save():
     # holding:Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "INFY"})
     # await holding.delete_from_db()
     # print(await retrieve_all_services(Holding.COLLECTION, Holding))
+    get_correct_symbol()
     return {"msg":"saved"}
 
 
