@@ -7,10 +7,11 @@ import numpy as np
 
 import requests
 import pandas as pd
+from bson import ObjectId
 
 from constants.global_contexts import kite_context
-from constants.settings import DEBUG, set_end_process, get_allocation
-from models.db_models import get_save_to_db, get_delete_from_db, get_update_in_db
+from constants.settings import DEBUG, set_end_process, TODAY
+from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
 from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
 
@@ -19,11 +20,14 @@ logger: Logger = get_logger(__name__)
 
 def get_schema():
     return {
+        "_id": "ObjectId",
         "stock_name": "str",
         "exchange": "str",
         "wallet": "float",
         "created_at": "datetime",
-        "first_load": "bool"
+        "last_buy_price": "float",
+        "remaining_allocation": "float",
+        "last_quantity": "float"
     }
 
 
@@ -32,13 +36,14 @@ class StockInfo:
     stock_name: str
     exchange: str = 'NSE'
     wallet: float = field(default=0.0)
+    _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="StockInfo", init=False)
     COLLECTION: str = field(default="stock", init=False)
     latest_indicator_price: float | None = field(default=None, init=False)
     latest_price: float = field(default=None, init=False)
     low: float = field(default=None, init=False)
     high: float = field(default=None, init=False)
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default=TODAY)
     __result_stock_df: pd.DataFrame | None = field(default=None, init=False)
     schema: dict = field(default_factory=get_schema, init=False)
     save_to_db: Callable = field(default=None, init=False)
@@ -48,6 +53,8 @@ class StockInfo:
     first_load: bool = field(default=True)  # while loading from db make it true
     in_position: bool = field(default=False)
     last_buy_price: float = field(default=None)
+    last_quantity: int = field(default=None)
+    remaining_allocation: float = field(default=0.0)
 
     def __post_init__(self):
         self.save_to_db = get_save_to_db(self.COLLECTION, self)
@@ -130,7 +137,10 @@ class StockInfo:
                 self.latest_indicator_price = recent_price
 
     def buy_parameters(self):
-        amount: float = get_allocation()
+        if self.first_load:
+            amount: float = self.remaining_allocation/3
+        else:
+            amount: float = self.remaining_allocation
 
         def get_quantity_and_price(s_orders):
             accumulated, quantity = 0, 0
@@ -186,21 +196,31 @@ class StockInfo:
             # self.first_load = False  # or else it will constantly sell and buy
             return True
         else:
-            if self.__result_stock_df.shape[0] > 10:
-                stock_df = self.__result_stock_df.copy()
-                stock_df.insert(1, "line", kaufman_indicator(stock_df['price']))
-                stock_df.insert(2, "signal", stock_df.line.ewm(span=5).mean())
-                stock_df.insert(3, "min", stock_df.signal.cummin())
-                stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']*1.002), 1, 0)
-                # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
-                if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0 and self.last_buy_price > (1+0.02)*self.latest_price:
-                    return True
-            elif self.__result_stock_df.shape[0] > 1:
-                stock_df = self.__result_stock_df.copy()
-                stock_df.insert(1, "signal", stock_df.price.ewm(span=5).mean())
-                stock_df.insert(2, "min", stock_df.signal.cummin())
-                stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']), 1, 0)
-                # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
-                if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0:
-                    return True
+            logger.info(f"{self.latest_price},{self.last_buy_price}")
+            if self.latest_price*1.06 < self.last_buy_price:
+
+                # if self.__result_stock_df.shape[0] > 10:
+                #     stock_df = self.__result_stock_df.copy()
+                #     stock_df.insert(1, "line", kaufman_indicator(stock_df['price']))
+                #     stock_df.insert(2, "signal", stock_df.line.ewm(span=5).mean())
+                #     stock_df.insert(3, "min", stock_df.signal.cummin())
+                #     stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']*1.002), 1, 0)
+                #     # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
+                #     if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0 and self.last_buy_price > (1+0.02)*self.latest_price:
+                #         return True
+                if self.__result_stock_df.shape[0] > 1:
+                    logger.info("entered")
+                    stock_df = self.__result_stock_df.copy()
+                    # stock_df.insert(1, "signal", stock_df.price.ewm(span=5).mean())
+                    # stock_df.insert(2, "min", stock_df.signal.cummin())
+                    # stock_df['positions'] = np.where((stock_df['signal'] > stock_df['min']), 1, 0)
+                    # # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
+                    # if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0:
+                    #     return True
+                    stock_df.insert(1, "signal", stock_df['price'].ewm(span=360).mean())
+                    stock_df.insert(2, "max", stock_df['signal'].rolling(window=360).max())
+                    stock_df.insert(3, "min", stock_df['signal'].rolling(window=360).min())
+                    # stock_df.insert(4, "posi", stock_df['signal'].rolling(window=360).min())
+                    if stock_df[stock_df["signal"].iloc[-1] > stock_df["min"]].iloc[-1]:
+                        return True
         return False

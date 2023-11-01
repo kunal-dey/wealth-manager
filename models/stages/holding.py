@@ -8,7 +8,7 @@ from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
 from models.stock_info import StockInfo
 from models.stock_stage import Stage
-from models.db_models import get_save_to_db, get_delete_from_db, get_update_in_db
+from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
 
 from constants.settings import DELIVERY_INCREMENTAL_RETURN
 

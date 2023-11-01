@@ -1,7 +1,6 @@
 from models.costs.delivery_trading_cost import DeliveryTransactionCost
 from models.costs.intraday_trading_cost import IntradayTransactionCost
 from models.stock_info import StockInfo
-from datetime import datetime
 from dataclasses import dataclass, field
 
 from dateutil.rrule import rrule, WEEKLY, MO, TU, WE, TH, FR
@@ -14,7 +13,7 @@ from utils.logger import get_logger
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
 from constants.settings import DELIVERY_INITIAL_RETURN, DELIVERY_INCREMENTAL_RETURN, INTRADAY_INITIAL_RETURN, \
-    EXPECTED_MINIMUM_MONTHLY_RETURN, DEBUG, get_allocation
+    EXPECTED_MINIMUM_MONTHLY_RETURN, DEBUG, get_allocation, TODAY
 
 from utils.take_position import short
 
@@ -33,8 +32,9 @@ class Stage:
     last_price: float = field(default=None, init=False)
     trigger: float = field(default=None, init=False)
     cost: float = field(default=None, init=False)
-    continuous_down: int = field(default=0, init=False)
-    
+    continuous_down: int = field(default=0, init=False)  # TODO://remove it
+
+    base_return: float = field(default=DELIVERY_INITIAL_RETURN, init=False)
 
     @property
     def invested_amount(self) -> float:
@@ -45,7 +45,7 @@ class Stage:
 
     @property
     def number_of_days(self):
-        dtstart, until = self.stock.created_at.date(), datetime.now().date()
+        dtstart, until = self.stock.created_at.date(), TODAY
         days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dtstart, until=until).count()
         for day in load_holidays()['dates']:
             if dtstart <= day.date() <= until:
@@ -70,17 +70,19 @@ class Stage:
     def current_expected_return(self):
         if self.number_of_days > 2:
             # if accumulated return > 0.03 then return 0.03 else accumulated return
-            return min(
+            returns = min(
                 ((1 + DELIVERY_INITIAL_RETURN) ** self.number_of_days) - 1,
                 EXPECTED_MINIMUM_MONTHLY_RETURN
             )
+            return 3 * returns if self.stock.remaining_allocation > 0 else returns
         elif self.number_of_days == 2:
-            return min(
+            returns = min(
                 ((1 + DELIVERY_INITIAL_RETURN) ** (self.number_of_days + 1)) - 1,
                 EXPECTED_MINIMUM_MONTHLY_RETURN
             )
+            return 3 * returns if self.stock.remaining_allocation > 0 else returns
         else:
-            return INTRADAY_INITIAL_RETURN
+            return DELIVERY_INITIAL_RETURN * (3 if self.stock.remaining_allocation > 0 else 1)
 
     @property
     def incremental_return(self):
@@ -182,6 +184,9 @@ class Stage:
             self.last_price = self.current_price
             self.current_price = latest_price
 
+        if self.current_price is None and self.last_price is None:
+            return "CONTINUE"
+
         buy_price = self.buy_price
         selling_price = self.current_price
         tx_cost = self.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
@@ -197,23 +202,21 @@ class Stage:
             # if self.position_price > self.current_price * (1 + 0.002) and self.number_of_days <= 1:
             if low is not None:
                 logger.info(f"buy price:{self.buy_price}")
-                if self.buy_price > self.current_price == low and self.number_of_days <= 1 and abs(wallet_value/get_allocation()) > 0.005:
-                    if DEBUG:
-                        if self.last_price is not None:
-                            if self.last_price > self.current_price:
-                                self.continuous_down += 1
-                                if self.continuous_down > 2:
-                                    if self.sell():
-                                        return "DAY1NOT"
-                    else:
-                        b_orders: list = self.stock.get_quote["buy"]
-                        if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
-                            if self.last_price is not None:
-                                if self.last_price > self.current_price:
-                                    self.continuous_down += 1
-                                    if self.continuous_down > 2:
-                                        if self.sell():
-                                            return "DAY1NOT"
+                # if self.buy_price > self.current_price == low and self.number_of_days <= 1 and abs((wallet_value*self.quantity)/get_allocation()) > 0.005:
+                #     if DEBUG:
+                #         if self.last_price is not None:
+                #             if self.last_price > self.current_price:
+                #                 if self.sell():
+                #                     return "DAY1NOT"
+                #     else:
+                #         b_orders: list = self.stock.get_quote["buy"]
+                #         if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
+                #             if self.last_price is not None:
+                #                 if self.last_price > self.current_price:
+                #                     self.continuous_down += 1
+                #                     if self.continuous_down > 2:
+                #                         if self.sell():
+                #                             return "DAY1NOT"
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
                 if self.cost * (1 + self.current_expected_return) < self.current_price < (4*self.trigger) / (3*(

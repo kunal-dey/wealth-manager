@@ -4,14 +4,14 @@ from logging import Logger
 import yfinance as yf
 
 from models.account import Account
-from models.stages.holding import Holding
+from models.db_models.db_functions import retrieve_all_services, find_by_name
 from models.stages.position import Position
 from models.stock_info import StockInfo
 from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, STOP_BUYING_TIME, \
-    set_allocation, get_max_stocks, set_max_stocks, DEBUG
+    set_allocation, get_max_stocks, set_max_stocks, DEBUG, set_end_process
 from utils.tracking_components.stock_tracking import filter_stocks
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -38,6 +38,25 @@ async def background_task():
     """
     START OF DAY ACTIVITIES
     """
+    stock_list: list[StockInfo] = await retrieve_all_services(StockInfo.COLLECTION, StockInfo)
+    logger.info(f"{stock_list}")
+
+    logger.info(f"{account.available_cash}")
+
+    # fetch all the stocks already added in stock list
+    for stock_obj in stock_list:
+        stock_obj.first_load = False
+        account.stocks_to_track[stock_obj.stock_name] = stock_obj
+
+    # load all holdings from the database
+    await account.load_holdings()
+
+    initial_list_of_holdings = account.holdings.keys()
+
+    account.convert_holdings_to_positions()
+
+    # TODO: delete all flagged stock which has been sold yesterday
+    #   delete the csv file for all the price data tracked
 
     # this part will loop till the trading times end
     while current_time < END_TIME:
@@ -47,10 +66,14 @@ async def background_task():
 
         try:
             if not_loaded and current_time >= START_TIME:
-                trackable_stocks = filter_stocks(obtained_stock_list)
-                filtered_stocks = [i[:-3] for i in trackable_stocks]
-                prediction_df = yf.download(tickers=trackable_stocks, period='1wk', interval='1m', show_errors=False)['Close']
-                set_allocation(30000 / len(filtered_stocks))
+                # trackable_stocks = filter_stocks(obtained_stock_list)
+                # filtered_stocks = [i[:-3] for i in trackable_stocks]
+                # TODO:checking for single stock change it for all stocks
+                filtered_stocks = ['WORTH']
+                # prediction_df = yf.download(tickers='trackable_stocks', period='1wk', interval='1m', show_errors=False)['Close']
+                prediction_df = yf.download(tickers='WORTH.NS', period='1wk', interval='1m', show_errors=False)
+                available_cash = 30000
+                set_allocation(available_cash / len(filtered_stocks))
                 set_max_stocks(len(filtered_stocks))
 
                 logger.info(f"list of stocks: {filtered_stocks}")
@@ -63,15 +86,6 @@ async def background_task():
             for chosen_stock in chosen_stocks():
                 if chosen_stock not in list(account.stocks_to_track.keys()) and len(account.stocks_to_track) < get_allocation():
                     account.stocks_to_track[chosen_stock] = StockInfo(chosen_stock, 'NSE')
-            """
-                update price for all the stocks which are being tracked
-            """
-
-            for stock in account.stocks_to_track.keys():
-                account.stocks_to_track[stock].update_price()
-                # because the instance of the stock stored in position is not the same stored in stocks_to_track
-                if stock in account.positions.keys():
-                    account.positions[stock].stock = account.stocks_to_track[stock]
 
             if end_process():
                 break
@@ -81,15 +95,11 @@ async def background_task():
             """
 
             if START_TIME < current_time < STOP_BUYING_TIME:
-                try:
-                    # if current_time > START_BUYING_TIME:
-                    account.buy_stocks()
-                except:
-                    pass
 
                 for stock_col in filtered_stocks:
                     if len(account.stocks_to_track) < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
                         account.stocks_to_track[stock_col] = StockInfo(stock_col, 'NSE')
+                        account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
                         if not DEBUG:
 
                             sell_orders: list = account.stocks_to_track[stock_col].get_quote["sell"]
@@ -106,6 +116,22 @@ async def background_task():
                         # stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
                         # stock_df.columns = ['price']
                         # stock_df.to_csv(f"temp/{stock_col}.csv")
+
+                """
+                    update price for all the stocks which are being tracked
+                """
+
+                for stock in account.stocks_to_track.keys():
+                    account.stocks_to_track[stock].update_price()
+                    # because the instance of the stock stored in position is not the same stored in stocks_to_track
+                    if stock in account.positions.keys():
+                        account.positions[stock].stock = account.stocks_to_track[stock]
+
+                try:
+                    # if current_time > START_BUYING_TIME:
+                    account.buy_stocks()
+                except:
+                    pass
 
             """
                 if the trigger for selling is breached in position then sell
@@ -137,23 +163,27 @@ async def background_task():
             for position_name in positions_to_delete:
                 del account.positions[position_name]
 
-            """
-                if the trigger for selling is breached in holding then sell
-            """
+            if DEBUG:
+                if len(account.stocks_to_track) == 0:
+                    set_end_process(True)
 
-            holdings_to_delete = []  # this is needed or else it will alter the length during loop
-
-            for holding_name in account.holdings.keys():
-                holding: Holding = account.holdings[holding_name]
-
-                if START_TIME < current_time:
-                    if holding.breached():
-                        logger.info(f" line 89 -->sell {holding.stock.stock_name} at {holding.stock.latest_price}")
-                        holdings_to_delete.append(holding_name)
-                        del account.stocks_to_track[holding_name]
-
-            for holding_name in holdings_to_delete:
-                del account.holdings[holding_name]
+            # """
+            #     if the trigger for selling is breached in holding then sell
+            # """
+            #
+            # holdings_to_delete = []  # this is needed or else it will alter the length during loop
+            #
+            # for holding_name in account.holdings.keys():
+            #     holding: Holding = account.holdings[holding_name]
+            #
+            #     if START_TIME < current_time:
+            #         if holding.breached():
+            #             logger.info(f" line 89 -->sell {holding.stock.stock_name} at {holding.stock.latest_price}")
+            #             holdings_to_delete.append(holding_name)
+            #             del account.stocks_to_track[holding_name]
+            #
+            # for holding_name in holdings_to_delete:
+            #     del account.holdings[holding_name]
 
 
         except:
@@ -163,7 +193,26 @@ async def background_task():
     logger.info(f" remaining stocks wallet : {wallet_list}")
 
     """
-    END OF DAY ACTIVITIES
+        END OF DAY ACTIVITIES
     """
+
+    # stock information is stored in the db.
+    # this is from an older code where the holdings weren't present, but the stock was tracked for more than 1 day.
+    for stock_key in account.stocks_to_track.keys():
+        """
+            if the remaining stock to track is already available update it or else add a new record in db
+        """
+        stock_model = await find_by_name(StockInfo.COLLECTION, StockInfo, {"stock_name": f"{stock_key}"})
+        if stock_model is None:
+            await account.stocks_to_track[stock_key].save_to_db()
+        else:
+            await account.stocks_to_track[stock_key].update_in_db()
+
+    # Since only positions are stored in the database, so first positions are converted to holdings.
+    # After which new holdings are added and old holdings are updated.
+    await account.store_all_holdings()
+
+    # deleting all holding data from db which have been sold
+    await account.remove_all_sold_holdings(initial_list_of_holdings)
 
     logger.info("TASK ENDED")

@@ -1,9 +1,11 @@
 from datetime import datetime
 
-DEBUG = False
+DEBUG = True
 
 # time settings
 __current_time = datetime.now()
+
+TODAY = datetime(2023, 10, 27) if DEBUG else datetime.now()
 
 if DEBUG:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 0, 1, 0)
@@ -22,7 +24,7 @@ SLEEP_INTERVAL = 1 if DEBUG else 30
 DELIVERY_INITIAL_RETURN = 0.002
 DELIVERY_INCREMENTAL_RETURN = 0.004
 
-INTRADAY_INITIAL_RETURN = 0.00
+INTRADAY_INITIAL_RETURN = 0.002
 INTRADAY_INCREMENTAL_RETURN = 0.004
 
 EXPECTED_MINIMUM_MONTHLY_RETURN = 0.06  # minimum monthly_return which is expected
