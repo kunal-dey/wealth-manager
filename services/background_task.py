@@ -2,6 +2,7 @@ from datetime import datetime
 from asyncio import sleep
 from logging import Logger
 import yfinance as yf
+import pandas as pd
 
 from models.account import Account
 from models.db_models.db_functions import retrieve_all_services, find_by_name
@@ -9,10 +10,11 @@ from models.stages.position import Position
 from models.stock_info import StockInfo
 from routes.stock_input import chosen_stocks
 from utils.logger import get_logger
+from utils.tracking_components.fetch_prices import fetch_current_prices
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, STOP_BUYING_TIME, \
     set_allocation, get_max_stocks, set_max_stocks, DEBUG, set_end_process
-from utils.tracking_components.stock_tracking import filter_stocks
+from utils.tracking_components.select_stocks import select_stocks
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
 logger: Logger = get_logger(__name__)
@@ -33,7 +35,9 @@ async def background_task():
     prediction_df, obtained_stock_list = None, await get_correct_symbol()
 
     not_loaded = True
-    filtered_stocks = []
+    filtered_stocks, selected_stocks = [], []
+
+    logger.info(f"{account.available_cash}")
 
     """
     START OF DAY ACTIVITIES
@@ -66,15 +70,16 @@ async def background_task():
 
         try:
             if not_loaded and current_time >= START_TIME:
-                # trackable_stocks = filter_stocks(obtained_stock_list)
-                # filtered_stocks = [i[:-3] for i in trackable_stocks]
-                # TODO:checking for single stock change it for all stocks
-                filtered_stocks = ['WORTH']
-                # prediction_df = yf.download(tickers='trackable_stocks', period='1wk', interval='1m', show_errors=False)['Close']
-                prediction_df = yf.download(tickers='WORTH.NS', period='1wk', interval='1m', show_errors=False)
+                obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
+                prediction_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1wk', interval='1m', progress=False)['Close']
+                prediction_df.index = pd.to_datetime(prediction_df.index)
+                prediction_df = prediction_df.loc["2023-10-31"]
                 available_cash = 30000
-                set_allocation(available_cash / len(filtered_stocks))
-                set_max_stocks(len(filtered_stocks))
+                set_allocation(10000)
+                set_max_stocks(3)
+                prediction_df.reset_index(drop=True, inplace=True)
+                prediction_df = prediction_df.ffill().bfill().dropna(axis=1)
+                filtered_stocks = [i[:-3] for i in list(prediction_df.columns)]
 
                 logger.info(f"list of stocks: {filtered_stocks}")
                 logger.info(f"allocation: {get_allocation()}")
@@ -95,8 +100,18 @@ async def background_task():
             """
 
             if START_TIME < current_time < STOP_BUYING_TIME:
+                # update the prediction_df after every interval
+                new_cost_df = await fetch_current_prices(filtered_stocks)
+                if new_cost_df is None:
+                    set_end_process(True)
+                else:
+                    prediction_df = pd.concat([prediction_df, new_cost_df], ignore_index=True)
+                    prediction_df = prediction_df.ffill().bfill()
 
-                for stock_col in filtered_stocks:
+                selected_stocks = [st[:-3] for st in select_stocks(prediction_df)]
+
+                # selecting stock which meets the criteria
+                for stock_col in selected_stocks:
                     if len(account.stocks_to_track) < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
                         account.stocks_to_track[stock_col] = StockInfo(stock_col, 'NSE')
                         account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
@@ -128,7 +143,6 @@ async def background_task():
                         account.positions[stock].stock = account.stocks_to_track[stock]
 
                 try:
-                    # if current_time > START_BUYING_TIME:
                     account.buy_stocks()
                 except:
                     pass
@@ -154,37 +168,12 @@ async def background_task():
                         account.stocks_to_track[position_name].in_position = False
                         positions_to_delete.append(position_name)
 
-                # if position.breached():
-                #     logger.info(f" line 89 -->sell {position.stock.stock_name} at {position.stock.latest_price}")
-                #     positions_to_delete.append(position_name)
-                #     del account.stocks_to_track[position_name]
-                #     filtered_stocks.remove(position_name)
-
             for position_name in positions_to_delete:
                 del account.positions[position_name]
 
             if DEBUG:
                 if len(account.stocks_to_track) == 0:
                     set_end_process(True)
-
-            # """
-            #     if the trigger for selling is breached in holding then sell
-            # """
-            #
-            # holdings_to_delete = []  # this is needed or else it will alter the length during loop
-            #
-            # for holding_name in account.holdings.keys():
-            #     holding: Holding = account.holdings[holding_name]
-            #
-            #     if START_TIME < current_time:
-            #         if holding.breached():
-            #             logger.info(f" line 89 -->sell {holding.stock.stock_name} at {holding.stock.latest_price}")
-            #             holdings_to_delete.append(holding_name)
-            #             del account.stocks_to_track[holding_name]
-            #
-            # for holding_name in holdings_to_delete:
-            #     del account.holdings[holding_name]
-
 
         except:
             logger.exception("Kite error may have happened")

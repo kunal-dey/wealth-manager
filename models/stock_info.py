@@ -217,10 +217,9 @@ class StockInfo:
                     # # logger.info(f" positions {self.stock_name}:{stock_df['positions'].iloc[-1]},{stock_df['positions'].iloc[-2]}")
                     # if stock_df['positions'].iloc[-1] == 1 and stock_df['positions'].iloc[-2] == 0:
                     #     return True
-                    stock_df.insert(1, "signal", stock_df['price'].ewm(span=360).mean())
-                    stock_df.insert(2, "max", stock_df['signal'].rolling(window=360).max())
-                    stock_df.insert(3, "min", stock_df['signal'].rolling(window=360).min())
+                    stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
+                    stock_df.insert(2, "min", stock_df['signal'].rolling(window=60).min())
                     # stock_df.insert(4, "posi", stock_df['signal'].rolling(window=360).min())
-                    if stock_df[stock_df["signal"].iloc[-1] > stock_df["min"]].iloc[-1]:
+                    if stock_df[stock_df["signal"].iloc[-1] > stock_df["min"]].iloc[-1] * 1.001:
                         return True
         return False

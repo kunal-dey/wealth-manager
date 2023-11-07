@@ -1,8 +1,10 @@
 from logging import Logger
 
+import requests
 from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
+import pandas as pd
 
 from constants.global_contexts import set_access_token
 
@@ -111,8 +113,11 @@ async def save():
     # holding:Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "INFY"})
     # await holding.delete_from_db()
     # print(await retrieve_all_services(Holding.COLLECTION, Holding))
-    get_correct_symbol()
-    return {"msg":"saved"}
+    # get_correct_symbol()
+    resp = requests.get(f"http://127.0.0.1:8082/prices")
+    data = resp.json()
+    print(pd.DataFrame({st: [data[st]] for st in data.keys()}))
+    return {"msg": "saved"}
 
 
 if __name__ == "__main__":

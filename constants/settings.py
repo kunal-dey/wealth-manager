@@ -5,7 +5,7 @@ DEBUG = True
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2023, 10, 27) if DEBUG else datetime.now()
+TODAY = datetime(2023, 11, 1) if DEBUG else datetime.now()
 
 if DEBUG:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 0, 1, 0)
