@@ -12,8 +12,7 @@ from utils.logger import get_logger
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
-from constants.settings import DELIVERY_INITIAL_RETURN, DELIVERY_INCREMENTAL_RETURN, INTRADAY_INITIAL_RETURN, \
-    EXPECTED_MINIMUM_MONTHLY_RETURN, DEBUG, get_allocation, TODAY
+from constants.settings import DELIVERY_INITIAL_RETURN, DELIVERY_INCREMENTAL_RETURN, EXPECTED_MINIMUM_MONTHLY_RETURN, DEBUG, TODAY
 
 from utils.take_position import short
 
@@ -23,7 +22,6 @@ logger: Logger = get_logger(__name__)
 @dataclass
 class Stage:
     buy_price: float
-    position_price: float
     quantity: int
     product_type: ProductType
     position_type: PositionType
@@ -32,23 +30,15 @@ class Stage:
     last_price: float = field(default=None, init=False)
     trigger: float = field(default=None, init=False)
     cost: float = field(default=None, init=False)
-    continuous_down: int = field(default=0, init=False)  # TODO://remove it
 
     base_return: float = field(default=DELIVERY_INITIAL_RETURN, init=False)
 
     @property
-    def invested_amount(self) -> float:
-        """
-            amount invested in this stock (transaction cost is not included)
-        """
-        return self.position_price * abs(self.quantity)
-
-    @property
     def number_of_days(self):
-        dtstart, until = self.stock.created_at.date(), TODAY
+        dtstart, until = self.stock.created_at.date(), TODAY.date()
         days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dtstart, until=until).count()
         for day in load_holidays()['dates']:
-            if dtstart <= day.date() <= until:
+            if dtstart < day.date() < until:
                 days -= 1
         return days
 
@@ -68,16 +58,10 @@ class Stage:
 
     @property
     def current_expected_return(self):
-        if self.number_of_days > 2:
+        if self.number_of_days >= 2:
             # if accumulated return > 0.03 then return 0.03 else accumulated return
             returns = min(
                 ((1 + DELIVERY_INITIAL_RETURN) ** self.number_of_days) - 1,
-                EXPECTED_MINIMUM_MONTHLY_RETURN
-            )
-            return 3 * returns if self.stock.remaining_allocation > 0 else returns
-        elif self.number_of_days == 2:
-            returns = min(
-                ((1 + DELIVERY_INITIAL_RETURN) ** (self.number_of_days + 1)) - 1,
                 EXPECTED_MINIMUM_MONTHLY_RETURN
             )
             return 3 * returns if self.stock.remaining_allocation > 0 else returns
@@ -164,7 +148,7 @@ class Stage:
             selling_price = self.current_price
             tx_cost = self.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
             wallet_value = selling_price - (buy_price + tx_cost)
-            self.stock.wallet += wallet_value * self.quantity
+            self.stock.wallet = wallet_value * self.quantity
             logger.info(f"Wallet: {self.stock.wallet}")
             return True
         return False
@@ -193,40 +177,18 @@ class Stage:
         wallet_value = selling_price - (buy_price + tx_cost)
         logger.info(f"Wallet: {wallet_value}")
 
-        low = self.stock.low
-
         # if the position was long then on achieving the trigger, it should sell otherwise it should buy
         # to clear the position
         if (self.position_type == PositionType.LONG) and (self.current_price is not None):
             logger.info(f"{self.stock.stock_name} Earlier trigger:  {self.trigger}, latest price:{self.current_price}")
-            # if self.position_price > self.current_price * (1 + 0.002) and self.number_of_days <= 1:
-            if low is not None:
-                logger.info(f"buy price:{self.buy_price}")
-                # if self.buy_price > self.current_price == low and self.number_of_days <= 1 and abs((wallet_value*self.quantity)/get_allocation()) > 0.005:
-                #     if DEBUG:
-                #         if self.last_price is not None:
-                #             if self.last_price > self.current_price:
-                #                 if self.sell():
-                #                     return "DAY1NOT"
-                #     else:
-                #         b_orders: list = self.stock.get_quote["buy"]
-                #         if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
-                #             if self.last_price is not None:
-                #                 if self.last_price > self.current_price:
-                #                     self.continuous_down += 1
-                #                     if self.continuous_down > 2:
-                #                         if self.sell():
-                #                             return "DAY1NOT"
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
-                if self.cost * (1 + self.current_expected_return) < self.current_price < (4*self.trigger) / (3*(
-                        1 + self.incremental_return)):
+                if self.cost * (1 + self.current_expected_return) < self.current_price < self.trigger / (
+                        1 + (3/4)*self.incremental_return):
                     if DEBUG:
                         if self.sell():
                             if self.number_of_days <= 1:
                                 return "DAY1BREACHED"
-                            elif self.number_of_days == 2:
-                                return "DAY2BREACHED"
                             else:
                                 return "DAYNBREACHED"
                     else:
@@ -235,8 +197,6 @@ class Stage:
                             if self.sell():
                                 if self.number_of_days <= 1:
                                     return "DAY1BREACHED"
-                                elif self.number_of_days == 2:
-                                    return "DAY2BREACHED"
                                 else:
                                     return "DAYNBREACHED"
             self.set_trigger(self.current_price)

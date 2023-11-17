@@ -17,7 +17,6 @@ def get_schema():
     return {
         "_id": "ObjectId",
         "buy_price": "float",
-        "position_price": "str",
         "quantity": "int",
         "product_type": ProductType,
         "position_type": PositionType,

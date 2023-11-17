@@ -1,10 +1,9 @@
-import json
 from dataclasses import dataclass, field
 from logging import Logger
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
-from constants.settings import DEBUG
+from constants.settings import DEBUG, STARTING_CASH, get_allocation
 from constants.global_contexts import kite_context
 from models.db_models.db_functions import retrieve_all_services, jsonify, find_by_name
 from models.stages.holding import Holding
@@ -16,11 +15,21 @@ from utils.take_position import long
 logger: Logger = get_logger(__name__)
 
 
+def get_available_cash():
+    if DEBUG:
+        return STARTING_CASH
+    else:
+        payload = kite_context.margins()
+        return payload['equity']['available']['live_balance']
+
+
 @dataclass
 class Account:
     stocks_to_track: dict[str, StockInfo] = field(default_factory=dict, init=False)
     positions: dict[str, Position] = field(default_factory=dict, init=False)
     holdings: dict[str, Holding] = field(default_factory=dict, init=False)
+    available_cash: float = field(default_factory=get_available_cash)
+    starting_cash: float = field(default_factory=get_available_cash)
 
     async def load_holdings(self):
         """
@@ -32,6 +41,7 @@ class Account:
 
         for holding_obj in holding_list:
             self.holdings[holding_obj.stock.stock_name] = holding_obj
+            self.starting_cash += get_allocation()/3
             if holding_obj.stock.stock_name in list(self.stocks_to_track.keys()):
                 self.holdings[holding_obj.stock.stock_name].stock = self.stocks_to_track[holding_obj.stock.stock_name]
                 self.holdings[holding_obj.stock.stock_name].stock.quantity = self.holdings[holding_obj.stock.stock_name].quantity
@@ -42,6 +52,7 @@ class Account:
         :return: None
         """
         for stock_key in list(self.stocks_to_track.keys()):
+            logger.info(f"{stock_key}: allocation {self.stocks_to_track[stock_key].remaining_allocation}")
             # if stock_key not in self.positions.keys() and stock_key not in self.holdings.keys():
             if self.stocks_to_track[stock_key].remaining_allocation > 0:
                 if not DEBUG:
@@ -71,7 +82,6 @@ class Account:
                                 buy_price=buy_price,
                                 stock=self.stocks_to_track[stock_key],
                                 position_type=PositionType.LONG,
-                                position_price=self.stocks_to_track[stock_key].latest_indicator_price if self.stocks_to_track[stock_key].latest_indicator_price else buy_price,
                                 quantity=int(quantity),
                                 product_type=ProductType.DELIVERY
                             )
@@ -84,7 +94,6 @@ class Account:
                                 buy_price=avg_price,
                                 stock=self.stocks_to_track[stock_key],
                                 position_type=PositionType.LONG,
-                                position_price=self.stocks_to_track[stock_key].latest_indicator_price if self.stocks_to_track[stock_key].latest_indicator_price else buy_price,
                                 quantity=int(total_quantity),
                                 product_type=ProductType.DELIVERY
                             )
@@ -105,11 +114,11 @@ class Account:
         Since only holdings are stored so positions are converted into holdings
         :return: None
         """
+        self.holdings = {}
         for position_key in self.positions.keys():
             position = self.positions[position_key]
             self.holdings[position_key] = Holding(
                 buy_price=position.buy_price,
-                position_price=position.position_price,
                 quantity=position.quantity,
                 product_type=position.product_type,
                 position_type=position.position_type,
@@ -123,11 +132,11 @@ class Account:
         Since only holdings are stored so positions are converted into holdings
         :return: None
         """
+        self.positions = {}
         for holding_key in self.holdings.keys():
             holding = self.holdings[holding_key]
             self.positions[holding_key] = Position(
                 buy_price=holding.buy_price,
-                position_price=holding.position_price,
                 quantity=holding.quantity,
                 product_type=holding.product_type,
                 position_type=holding.position_type,
@@ -157,10 +166,19 @@ class Account:
         :return:
         """
         for holding_key in initial_list_of_holdings:
+            holding_model = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": f"{holding_key}"})
             if holding_key not in list(self.holdings.keys()):
-                await self.holdings[holding_key].delete_from_db(search_dict={'symbol': holding_key})
+                await holding_model.delete_from_db()
 
-    @property
-    def available_cash(self):
-        payload = kite_context.margins()
-        return payload['equity']['available']['live_balance']
+    async def remove_all_sold_stocks(self, initial_list_of_stocks):
+        """
+        if any holding is sold, then that holding data is removed from the db
+        :param initial_list_of_stocks: list[str]
+        :return:
+        """
+        for stock_key in initial_list_of_stocks:
+            stock_model = await find_by_name(StockInfo.COLLECTION, StockInfo, {"stock_name": f"{stock_key}"})
+            if stock_key not in list(self.stocks_to_track.keys()):
+                await stock_model.delete_from_db()
+
+
