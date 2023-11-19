@@ -5,6 +5,7 @@ from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
 import pandas as pd
+from datetime import datetime
 
 from constants.global_contexts import set_access_token
 
@@ -29,6 +30,11 @@ async def home():
     :return:
     """
     return {"message": "Welcome to the Zerodha trading system"}
+
+
+@app.route("/time")
+def get_time():
+    return {"current_time": datetime.now()}
 
 
 @app.get("/set")
