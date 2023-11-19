@@ -68,7 +68,7 @@ async def background_task():
         logger.info("should not enter")
         prediction_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1wk', interval='1m', progress=False)['Close']
         prediction_df.index = pd.to_datetime(prediction_df.index)
-        prediction_df = prediction_df.loc[:"2023-11-15"]
+        prediction_df = prediction_df.loc[:"2023-11-16"]
         prediction_df.reset_index(drop=True, inplace=True)
         prediction_df = prediction_df.ffill().bfill().dropna(axis=1)
 

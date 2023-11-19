@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 
 from constants.global_contexts import kite_context
-from constants.settings import DEBUG
+from constants.settings import DEBUG, GENERATOR_URL
 
 
 async def fetch_current_prices(stock_list):
@@ -29,7 +29,7 @@ async def fetch_current_prices(stock_list):
         return dict1
 
     if DEBUG:
-        resp = requests.get(f"http://127.0.0.1:8082/prices")
+        resp = requests.get(f"http://{GENERATOR_URL}/prices")
         data = resp.json()['data']
         if data == 'ENDED':
             return None

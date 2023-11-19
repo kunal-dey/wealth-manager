@@ -1,11 +1,13 @@
 from datetime import datetime
 
-DEBUG = False
+DEBUG = True
 
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2023, 11, 16) if DEBUG else datetime.now()
+TODAY = datetime(2023, 11, 17) if DEBUG else datetime.now()
+
+GENERATOR_URL = '127.0.0.1:8082'
 
 if DEBUG:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 0, 1, 0)

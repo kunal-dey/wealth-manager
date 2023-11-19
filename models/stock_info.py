@@ -12,6 +12,7 @@ from constants.global_contexts import kite_context
 from constants.settings import DEBUG, set_end_process, TODAY
 from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
 from utils.logger import get_logger
+from constants.settings import GENERATOR_URL
 
 logger: Logger = get_logger(__name__)
 
@@ -74,7 +75,7 @@ class StockInfo:
         while retries < 4:
             try:
                 if DEBUG:
-                    response = requests.get(f"http://127.0.0.1:8082/price?symbol={self.stock_name}")
+                    response = requests.get(f"http://{GENERATOR_URL}/price?symbol={self.stock_name}")
                     return response.json()['data']
                 else:
                     quote: dict = self.get_quote
@@ -180,7 +181,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.02 < self.last_buy_price:
+            if self.latest_price*1.01 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
