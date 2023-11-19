@@ -181,7 +181,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.01 < self.last_buy_price:
+            if self.latest_price*1.03 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:

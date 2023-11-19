@@ -151,6 +151,11 @@ async def background_task():
                                 # stock in stocks to track
                                 account.available_cash -= get_allocation()
                                 _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                                stock_df = prediction_df[[f"{stock_col}.NS"]]
+                                stock_df.reset_index(inplace=True, drop=True)
+                                stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                                stock_df.columns = ['price']
+                                stock_df.to_csv(f"temp/{stock_col}.csv")
                         else:
                             raw_stock = StockInfo(stock_col, 'NSE')
                             if not DEBUG:
@@ -169,6 +174,11 @@ async def background_task():
                             # stock in stocks to track
                             account.available_cash -= get_allocation()
                             _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                            stock_df = prediction_df[[f"{stock_col}.NS"]]
+                            stock_df.reset_index(inplace=True, drop=True)
+                            stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                            stock_df.columns = ['price']
+                            stock_df.to_csv(f"temp/{stock_col}.csv")
 
                 """
                     update price for all the stocks which are being tracked
