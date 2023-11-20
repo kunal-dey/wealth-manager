@@ -253,7 +253,7 @@ async def background_task():
                     del account.stocks_to_track[position_name]  # delete from stocks to track
             else:
                 tx_cost = position.transaction_cost(buying_price=position.buy_price, selling_price=position.current_price) / position.quantity
-                wallet_value = position.current_price - (position.buy_price + tx_cost)
+                wallet_value = (position.current_price - (position.buy_price + tx_cost)) * position.quantity
                 wallet_order[wallet_value] = position_name
         else:
             if position.sell():
