@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from asyncio import sleep
 from logging import Logger
@@ -225,6 +226,7 @@ async def background_task():
 
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
+                    os.remove(f"temp/{position_name}.csv")
 
                 # if DEBUG:
                 #     if len(account.stocks_to_track) == 0:
@@ -266,6 +268,7 @@ async def background_task():
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
+        os.remove(f"temp/{position_name}.csv")
 
     # # to store all the stock with wallet value in ascending order
     # wallet_order = {float(account.stocks_to_track[st].wallet): st for st in account.stocks_to_track.keys()}
@@ -288,6 +291,7 @@ async def background_task():
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
+        os.remove(f"temp/{position_name}.csv")
 
     """
         END OF DAY ACTIVITIES
