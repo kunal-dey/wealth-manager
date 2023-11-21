@@ -12,7 +12,7 @@ from models.stock_info import StockInfo
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, set_max_stocks, DEBUG, set_end_process, DELIVERY_INITIAL_RETURN
+from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, set_max_stocks, DEBUG, set_end_process, DELIVERY_INITIAL_RETURN, START_BUYING_TIME, STOP_BUYING_TIME
 from utils.tracking_components.select_stocks import select_stocks
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -61,8 +61,7 @@ async def background_task():
     await account.load_holdings()
 
     try:
-        prediction_df = pd.read_csv(f"temp/prediction_df.csv")
-        prediction_df.drop(prediction_df.columns[0], axis=1, inplace=True)
+        prediction_df = pd.read_csv(f"temp/prediction_df.csv", index_col=0)
     except FileNotFoundError:
         prediction_df = None
     if prediction_df is None:
@@ -79,9 +78,6 @@ async def background_task():
     account.convert_holdings_to_positions()
 
     logger.info(f"starting cash : {account.available_cash}")
-
-    # TODO: delete all flagged stock which has been sold yesterday
-    #   delete the csv file for all the price data tracked
 
     # this part will loop till the trading times end
     while current_time < END_TIME:
@@ -116,6 +112,11 @@ async def background_task():
                     prediction_df = pd.concat([prediction_df, new_cost_df], ignore_index=True)
                     prediction_df = prediction_df.bfill().ffill()
                     prediction_df.dropna(axis=1, inplace=True)
+                    prediction_df = prediction_df[[col for col in list(prediction_df.columns) if '-BE' not in col]]
+                    prediction_df = prediction_df.iloc[-2000:]
+                    prediction_df = prediction_df.reset_index(drop=True)
+                    price_filter = list(prediction_df.iloc[-1][prediction_df.iloc[-1] > 30].index)
+                    prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
                 selected_stocks = [st[:-3] for st in select_stocks(prediction_df)]
@@ -126,15 +127,39 @@ async def background_task():
 
                 logger.info(f"track: {account.stocks_to_track.keys()}")
 
-                # selecting stock which meets the criteria
-                for stock_col in selected_stocks:
-                    # available cash keeps on changing so max_stocks keeps on changing
-                    set_max_stocks(int(account.available_cash/get_allocation()))
-                    if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
-                        # if wealth has crossed 0.005 then keep 1/3rd of stocks
-                        if today_profit > account.starting_cash*0.005:
-                            if ((2/3)*account.starting_cash + get_allocation()) <= account.available_cash:
-                        
+                if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
+                    # selecting stock which meets the criteria
+                    for stock_col in selected_stocks:
+                        # available cash keeps on changing so max_stocks keeps on changing
+                        set_max_stocks(int(account.available_cash/get_allocation()))
+                        if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
+                            # if wealth has crossed 0.005 then keep 1/3rd of stocks
+                            if today_profit > account.starting_cash*0.005:
+                                if ((2/3)*account.starting_cash + get_allocation()) <= account.available_cash:
+
+                                    raw_stock = StockInfo(stock_col, 'NSE')
+                                    if not DEBUG:
+
+                                        sell_orders: list = raw_stock.get_quote["sell"]
+                                        zero_quantity = True
+                                        for item in sell_orders:
+                                            if item['quantity'] > 0:
+                                                zero_quantity = False
+                                            break
+                                        if zero_quantity:
+                                            continue
+                                    account.stocks_to_track[stock_col] = raw_stock
+                                    account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
+                                    # even if it may seem that allocation is reduced when bought, actual change is while adding the
+                                    # stock in stocks to track
+                                    account.available_cash -= get_allocation()
+                                    _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                                    stock_df = prediction_df[[f"{stock_col}.NS"]]
+                                    stock_df.reset_index(inplace=True, drop=True)
+                                    stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                                    stock_df.columns = ['price']
+                                    stock_df.to_csv(f"temp/{stock_col}.csv")
+                            else:
                                 raw_stock = StockInfo(stock_col, 'NSE')
                                 if not DEBUG:
 
@@ -157,29 +182,11 @@ async def background_task():
                                 stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
                                 stock_df.columns = ['price']
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
-                        else:
-                            raw_stock = StockInfo(stock_col, 'NSE')
-                            if not DEBUG:
 
-                                sell_orders: list = raw_stock.get_quote["sell"]
-                                zero_quantity = True
-                                for item in sell_orders:
-                                    if item['quantity'] > 0:
-                                        zero_quantity = False
-                                    break
-                                if zero_quantity:
-                                    continue
-                            account.stocks_to_track[stock_col] = raw_stock
-                            account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
-                            # even if it may seem that allocation is reduced when bought, actual change is while adding the
-                            # stock in stocks to track
-                            account.available_cash -= get_allocation()
-                            _, _2 = account.stocks_to_track[stock_col].buy_parameters()
-                            stock_df = prediction_df[[f"{stock_col}.NS"]]
-                            stock_df.reset_index(inplace=True, drop=True)
-                            stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
-                            stock_df.columns = ['price']
-                            stock_df.to_csv(f"temp/{stock_col}.csv")
+                    try:
+                        account.buy_stocks()
+                    except:
+                        pass
 
                 """
                     update price for all the stocks which are being tracked
@@ -187,11 +194,6 @@ async def background_task():
 
                 for stock in account.stocks_to_track.keys():
                     account.stocks_to_track[stock].update_price()
-
-                try:
-                    account.buy_stocks()
-                except:
-                    pass
 
                 """
                     if the trigger for selling is breached in position then sell
@@ -227,10 +229,6 @@ async def background_task():
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
                     os.remove(f"temp/{position_name}.csv")
-
-                # if DEBUG:
-                #     if len(account.stocks_to_track) == 0:
-                #         set_end_process(True)
 
         except:
             logger.exception("Kite error may have happened")

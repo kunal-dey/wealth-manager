@@ -61,7 +61,7 @@ class Stage:
         if self.number_of_days >= 2:
             # if accumulated return > 0.03 then return 0.03 else accumulated return
             returns = min(
-                ((1 + DELIVERY_INITIAL_RETURN) ** self.number_of_days) - 1,
+                ((1 + DELIVERY_INITIAL_RETURN) ** (self.number_of_days+1)) - 1,
                 EXPECTED_MINIMUM_MONTHLY_RETURN
             )
             return 3 * returns if self.stock.remaining_allocation > 0 else returns
