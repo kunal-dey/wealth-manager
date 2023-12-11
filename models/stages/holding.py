@@ -34,6 +34,14 @@ class Holding(Stage):
     update_in_db: Callable = field(default=None, init=False)
     schema: dict = field(init=False, default_factory=get_schema)
 
+    @property
+    def object_id(self):
+        return self._id
+
+    @object_id.setter
+    def object_id(self, value: ObjectId):
+        self._id = value
+
     def __post_init__(self):
         self.save_to_db = get_save_to_db(self.COLLECTION, self)
         self.delete_from_db = get_delete_from_db(self.COLLECTION, self)

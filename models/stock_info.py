@@ -163,7 +163,6 @@ class StockInfo:
             self.__result_stock_df = pd.concat([self.__result_stock_df, stock_df], ignore_index=True)
         else:
             self.__result_stock_df = stock_df
-        # logger.info(f"{self.stock_name} : {self.__result_stock_df.shape[0]} , {current_price}")
         self.__result_stock_df.to_csv(f"temp/{self.stock_name}.csv")
         self.__result_stock_df = self.__result_stock_df.bfill().ffill()
         self.__result_stock_df.dropna(axis=1, inplace=True)
@@ -181,14 +180,14 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.05 < self.last_buy_price:
+            if self.latest_price*1.015 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
                     logger.info("entered")
                     stock_df = self.__result_stock_df.copy()
-                    stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
-                    stock_df.insert(2, "min", stock_df['signal'].rolling(window=60).min())
-                    if stock_df["signal"].iloc[-1] > stock_df["min"].iloc[-1] * 1.002:
+                    # stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
+                    stock_df.insert(1, "min", stock_df['price'].rolling(window=60).min())
+                    if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.002:
                         return True
         return False

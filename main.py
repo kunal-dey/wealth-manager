@@ -1,20 +1,18 @@
 from logging import Logger
 
-import requests
 from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
-import pandas as pd
 from datetime import datetime
 
 from constants.global_contexts import set_access_token
+from models.db_models.db_functions import find_by_name
+from models.stages.holding import Holding
 
 from services.background_task import background_task
 from constants.global_contexts import kite_context
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
-
-from utils.tracking_components.verify_symbols import get_correct_symbol
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -89,40 +87,8 @@ for resource in resource_list:
 
 @app.get("/hit")
 async def save():
-    # stock_info = StockInfo(
-    #     stock_name="INFY",
-    # )
-    # holding = Holding(
-    #     buy_price=100,
-    #     position_price=101,
-    #     quantity=4,
-    #     product_type=ProductType.DELIVERY,
-    #     position_type=PositionType.LONG,
-    #     stock=stock_info
-    # )
-    # await holding.save_to_db()
-    # stock_info = StockInfo(
-    #     stock_name="TCS",
-    # )
-    # holding = Holding(
-    #     buy_price=200,
-    #     position_price=201,
-    #     quantity=34,
-    #     product_type=ProductType.DELIVERY,
-    #     position_type=PositionType.LONG,
-    #     stock=stock_info
-    # )
-    # await holding.save_to_db()
-    # holding.quantity = 37
-    # holding.product_type = ProductType.INTRADAY
-    # await holding.update_in_db()
-    # holding:Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "INFY"})
-    # await holding.delete_from_db()
-    # print(await retrieve_all_services(Holding.COLLECTION, Holding))
-    # get_correct_symbol()
-    resp = requests.get(f"http://127.0.0.1:8082/prices")
-    data = resp.json()
-    print(pd.DataFrame({st: [data[st]] for st in data.keys()}))
+    holding_model: Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "BRNL"})
+    await holding_model.delete_from_db()
     return {"msg": "saved"}
 
 

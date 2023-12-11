@@ -12,7 +12,7 @@ from models.stock_info import StockInfo
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, set_max_stocks, DEBUG, set_end_process, DELIVERY_INITIAL_RETURN, START_BUYING_TIME, STOP_BUYING_TIME
+from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME
 from utils.tracking_components.select_stocks import select_stocks
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -68,7 +68,7 @@ async def background_task():
         logger.info("should not enter")
         prediction_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1wk', interval='1m', progress=False)['Close']
         prediction_df.index = pd.to_datetime(prediction_df.index)
-        prediction_df = prediction_df.loc[:"2023-11-16"]
+        prediction_df = prediction_df.loc[:"2023-12-07"]
         prediction_df.reset_index(drop=True, inplace=True)
         prediction_df = prediction_df.ffill().bfill().dropna(axis=1)
 
@@ -153,7 +153,7 @@ async def background_task():
                                     # even if it may seem that allocation is reduced when bought, actual change is while adding the
                                     # stock in stocks to track
                                     account.available_cash -= get_allocation()
-                                    _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                                    # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
                                     stock_df = prediction_df[[f"{stock_col}.NS"]]
                                     stock_df.reset_index(inplace=True, drop=True)
                                     stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
@@ -176,17 +176,12 @@ async def background_task():
                                 # even if it may seem that allocation is reduced when bought, actual change is while adding the
                                 # stock in stocks to track
                                 account.available_cash -= get_allocation()
-                                _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                                # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
                                 stock_df = prediction_df[[f"{stock_col}.NS"]]
                                 stock_df.reset_index(inplace=True, drop=True)
                                 stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
                                 stock_df.columns = ['price']
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
-
-                    try:
-                        account.buy_stocks()
-                    except:
-                        pass
 
                 """
                     update price for all the stocks which are being tracked
@@ -194,6 +189,14 @@ async def background_task():
 
                 for stock in account.stocks_to_track.keys():
                     account.stocks_to_track[stock].update_price()
+
+                if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
+                    try:
+                        account.buy_stocks()
+                    except:
+                        pass
+
+
 
                 """
                     if the trigger for selling is breached in position then sell
@@ -243,6 +246,7 @@ async def background_task():
     for position_name in account.positions.keys():
         position: Position = account.positions[position_name]
         if position.trigger is None:
+            logger.info(f"{position.stock.stock_name}, {position.stock.latest_price}, {position.cost}")
             if position.stock.latest_price > position.cost:
                 if position.sell():
                     logger.info(f" crossed the cost -->sell {position.stock.stock_name} at {position.stock.latest_price}")
@@ -278,7 +282,7 @@ async def background_task():
     for wallet_v in sorted(sorted_wallet_list, reverse=True):
         position_name = wallet_order[wallet_v]
         position: Position = account.positions[position_name]
-        if float(wallet_v) + today_profit > account.starting_cash*DELIVERY_INITIAL_RETURN:
+        if float(wallet_v) + today_profit > account.starting_cash*DAILY_MINIMUM_RETURN:
             if position.sell():
                 logger.info(f" SOLD at the end -->sell {position.stock.stock_name} at {position.stock.latest_price}")
                 positions_to_delete.append(position_name)

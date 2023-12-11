@@ -152,11 +152,12 @@ class Account:
         self.convert_positions_to_holdings()
 
         for holding_key in self.holdings.keys():
-            holding_model = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": f"{holding_key}"})
+            holding_model: Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": f"{holding_key}"})
 
             if holding_model is None:
                 await self.holdings[holding_key].save_to_db()
             else:
+                self.holdings[holding_key].object_id = holding_model.object_id  # because while updating it will take the id of the holding
                 await self.holdings[holding_key].update_in_db()
 
     async def remove_all_sold_holdings(self, initial_list_of_holdings):
@@ -166,8 +167,8 @@ class Account:
         :return:
         """
         for holding_key in initial_list_of_holdings:
-            holding_model = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": f"{holding_key}"})
             if holding_key not in list(self.holdings.keys()):
+                holding_model = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": f"{holding_key}"})
                 await holding_model.delete_from_db()
 
     async def remove_all_sold_stocks(self, initial_list_of_stocks):
@@ -177,8 +178,8 @@ class Account:
         :return:
         """
         for stock_key in initial_list_of_stocks:
-            stock_model = await find_by_name(StockInfo.COLLECTION, StockInfo, {"stock_name": f"{stock_key}"})
             if stock_key not in list(self.stocks_to_track.keys()):
+                stock_model = await find_by_name(StockInfo.COLLECTION, StockInfo, {"stock_name": f"{stock_key}"})
                 await stock_model.delete_from_db()
 
 
