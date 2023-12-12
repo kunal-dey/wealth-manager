@@ -17,7 +17,7 @@ if DEBUG:
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
     START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 30, 0)
-    END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 18)
+    END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 29)
     STOP_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 0, 0)
 
 SLEEP_INTERVAL = 1 if DEBUG else 45
