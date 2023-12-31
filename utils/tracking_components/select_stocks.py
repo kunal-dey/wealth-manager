@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from utils.logger import get_logger
+from utils.tracking_components.training_components.data_preparation import training_data
 
 logger: Logger = get_logger(__name__)
 
@@ -17,7 +18,8 @@ def select_stocks(running_df):
         index = col.index
         st_index = list(index)[0]
         en_index = list(index)[-1]
-        coeff = np.polyfit(last_signal_df[col.name].iloc[st_index:en_index].index, last_signal_df[col.name].iloc[st_index:en_index], 1)[0]
+        coeff = np.polyfit(last_signal_df[col.name].iloc[st_index:en_index].index,
+                           last_signal_df[col.name].iloc[st_index:en_index], 1)[0]
         return coeff
 
     # signal_df = running_df.ewm(span=30).mean()
@@ -40,7 +42,7 @@ def select_stocks(running_df):
     two_day_signal_df = running_df.reset_index(drop=True).rolling(window=420).min().dropna().iloc[-1080:-420]
     shorter_signal_df = running_df.reset_index(drop=True).rolling(window=15).min().iloc[-80:]
     # shortest_signal_df = running_df.reset_index(drop=True).iloc[-10:]
-    
+
     near_slopes = near_signal_df.apply(get_slope, axis=0)
     two_slopes = two_day_signal_df.apply(get_slope, axis=0)
     shorter_slopes = shorter_signal_df.apply(get_slope, axis=0)
@@ -55,11 +57,53 @@ def select_stocks(running_df):
         "shorter_coeff": shorter_slopes
         # "shortest_coeff": shortest_slopes
     })
-    track_df = coeff_df[(coeff_df.x2 > coeff_df.x3) & (coeff_df.x3 > coeff_df.x1) & (coeff_df.far_coeff > 0) & (coeff_df.near_coeff < 0) & (coeff_df.shorter_coeff > 0)]
-    track_df.insert(4, "far_per", coeff_df['far_coeff']/coeff_df['price'])
+    track_df = coeff_df[(coeff_df.x2 > coeff_df.x3) & (coeff_df.x3 > coeff_df.x1) & (coeff_df.far_coeff > 0) & (
+                coeff_df.near_coeff < 0) & (coeff_df.shorter_coeff > 0)]
+    track_df.insert(4, "far_per", coeff_df['far_coeff'] / coeff_df['price'])
     growing = list(track_df.sort_values(by='far_per', ascending=False).index)
 
     for st in list(result.iloc[-1].dropna().index):
         if st in growing:
             selected.append(st)
     return growing
+
+
+# def train_model(stock_list):
+#
+#     data_df = training_data([f"{st}.NS" for st in stock_list[:10]])
+#     logger.info(data_df)
+#
+#     train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df)
+#     model = trained_model(train_s, train)
+#     return model
+
+
+def predict_running_df(day_based_data, model, params):
+    three_month = day_based_data.iloc[-66] / day_based_data.iloc[-1].values
+    one_month = day_based_data.iloc[-22] / day_based_data.iloc[-1].values
+    one_week = day_based_data.iloc[-5] / day_based_data.iloc[-1].values
+    three_days = day_based_data.iloc[-3] / day_based_data.iloc[-1].values
+    mu, sigma = params
+    mu = mu.iloc[:-1]
+    sigma = sigma.iloc[:-1]
+
+    def predict_stocks(min_based_data):
+        data = {
+            '3mo_return': list(three_month),
+            '1mo_return': list(one_month),
+            '1wk_return': list(one_week),
+            '3d_return': list(three_days),
+            '1d_return': list(min_based_data.iloc[-375] / min_based_data.iloc[-1].values),
+            '2hr_return': list(min_based_data.iloc[-120] / min_based_data.iloc[-1].values),
+            '10m_return': list(min_based_data.iloc[-10] / min_based_data.iloc[-1].values),
+            '2hr_vol': list(min_based_data.iloc[-120:].std() / min_based_data.iloc[-120]),
+            '10m_vol': list(min_based_data.iloc[-10:].std() / min_based_data.iloc[-10])
+        }
+        running_df = pd.DataFrame(data, index=list((min_based_data.iloc[-375] / min_based_data.iloc[-1]).index))
+        running_df_s = (running_df-mu)/sigma
+        running_df['prob'] = model.predict(running_df_s)
+        running_df['position'] = np.where(running_df['prob'] > 0.95, 1, 0)
+
+        return list(running_df[running_df['position'] == 1].index)
+
+    return predict_stocks

@@ -1,9 +1,11 @@
 import os
+import pickle
 from datetime import datetime
 from asyncio import sleep
 from logging import Logger
 import yfinance as yf
 import pandas as pd
+from keras.models import load_model
 
 from models.account import Account
 from models.db_models.db_functions import retrieve_all_services, find_by_name
@@ -12,8 +14,9 @@ from models.stock_info import StockInfo
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
-from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME
-from utils.tracking_components.select_stocks import select_stocks
+from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
+    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE
+from utils.tracking_components.select_stocks import select_stocks, predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
 logger: Logger = get_logger(__name__)
@@ -32,6 +35,7 @@ async def background_task():
     account: Account = Account()
 
     prediction_df, obtained_stock_list = None, await get_correct_symbol()
+    obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
 
     not_loaded = True
     filtered_stocks, selected_stocks = [], []
@@ -62,15 +66,21 @@ async def background_task():
 
     try:
         prediction_df = pd.read_csv(f"temp/prediction_df.csv", index_col=0)
+        stocks_present = []
+        for a in [i[:-3] for i in list(prediction_df.columns)]:
+            for b in obtained_stock_list:
+                if a == b:
+                    stocks_present.append(f"{a}.NS")
+        prediction_df = prediction_df[stocks_present]
     except FileNotFoundError:
         prediction_df = None
     if prediction_df is None:
         logger.info("should not enter")
         prediction_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1wk', interval='1m', progress=False)['Close']
-        prediction_df.index = pd.to_datetime(prediction_df.index)
-        prediction_df = prediction_df.loc[:"2023-12-07"]
-        prediction_df.reset_index(drop=True, inplace=True)
         prediction_df = prediction_df.ffill().bfill().dropna(axis=1)
+        prediction_df.index = pd.to_datetime(prediction_df.index)
+        prediction_df = prediction_df.loc[:str(TRAINING_DATE.date())]
+        prediction_df.reset_index(drop=True, inplace=True)
 
     initial_list_of_holdings = list(account.holdings.keys())
     initial_list_of_stocks = list(account.stocks_to_track.keys())
@@ -78,6 +88,26 @@ async def background_task():
     account.convert_holdings_to_positions()
 
     logger.info(f"starting cash : {account.available_cash}")
+
+    """
+        model and parameter setup
+    """
+
+    # these are used as cache and will reduce the execution time
+    day_based_data = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='6mo', interval='1d', progress=False)['Close']
+    day_based_data.index = pd.to_datetime(day_based_data.index)
+    day_based_data = day_based_data.loc[:TRAINING_DATE]
+    day_based_data = day_based_data.ffill().bfill()
+
+    model = load_model(os.getcwd() + "/temp/DNN_model")
+
+    logger.info(f"model loaded: {model}")
+
+    params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
+
+    logger.info(f"mu and sigma loaded: {model}")
+
+    predict_stocks = predict_running_df(day_based_data, model, params)
 
     # this part will loop till the trading times end
     while current_time < END_TIME:
@@ -89,7 +119,7 @@ async def background_task():
 
         try:
             if not_loaded and current_time >= START_TIME:
-                obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
+                # obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
                 filtered_stocks = [i[:-3] for i in list(prediction_df.columns)]
 
                 logger.info(f"list of stocks: {obtained_stock_list}")
@@ -119,7 +149,9 @@ async def background_task():
                     prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
-                selected_stocks = [st[:-3] for st in select_stocks(prediction_df)]
+                # selected_stocks = [st[:-3] for st in select_stocks(prediction_df)]
+                # logger.info(f"chosen : {selected_stocks}")
+                selected_stocks = [st[:-3] for st in predict_stocks(prediction_df)]
                 logger.info(f"chosen : {selected_stocks}")
 
                 logger.info(f"starting cash : {account.starting_cash}")

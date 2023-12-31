@@ -58,3 +58,6 @@ Werkzeug==2.3.7
 wsproto==1.2.0
 yfinance==0.2.28
 zope.interface==6.0
+
+tensorflow~=2.15.0
+keras~=2.15.0

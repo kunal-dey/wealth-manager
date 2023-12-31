@@ -1,3 +1,5 @@
+import os
+import pickle
 from logging import Logger
 
 from quart import Quart, request, Blueprint
@@ -13,6 +15,8 @@ from services.background_task import background_task
 from constants.global_contexts import kite_context
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
+from utils.tracking_components.training_components.trained_model import train_model
+from utils.tracking_components.verify_symbols import get_correct_symbol
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -85,11 +89,29 @@ for resource in resource_list:
     app.register_blueprint(blueprint=resource)
 
 
-@app.get("/hit")
-async def save():
-    holding_model: Holding = await find_by_name(Holding.COLLECTION, Holding, {"stock.stock_name": "BRNL"})
-    await holding_model.delete_from_db()
-    return {"msg": "saved"}
+@app.get("/train")
+async def train():
+    obtained_stock_list = await get_correct_symbol()
+    logger.info(obtained_stock_list)
+
+    def training():
+        train_model(obtained_stock_list)
+
+    # starting the training process
+    app.add_background_task(training)
+    return {"message": "Training started"}
+
+
+@app.get("/predict")
+async def predict():
+    # obtained_stock_list = await get_correct_symbol()
+    # logger.info(obtained_stock_list)
+    # message = train_model(obtained_stock_list)
+    params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
+    mu, sigma = params
+
+    logger.info(mu.iloc[:-1])
+    return {"msg": "try"}
 
 
 if __name__ == "__main__":

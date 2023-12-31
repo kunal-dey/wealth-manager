@@ -185,7 +185,7 @@ class Stage:
             logger.info(f"{self.stock.stock_name} Earlier trigger:  {self.trigger}, latest price:{self.current_price}")
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
-                if self.cost * (1 + self.current_expected_return) < self.current_price < self.trigger:
+                if self.cost * (1 + self.current_expected_return) < self.current_price < self.trigger*(1+(1/2)*self.incremental_return):
                     if DEBUG:
                         if self.sell():
                             if self.number_of_days <= 1:
