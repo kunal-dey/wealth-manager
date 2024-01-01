@@ -8,11 +8,10 @@ import random
 
 import psutil as psutil
 import tensorflow as tf
-import keras
+from keras.callbacks import Callback
 from keras.layers import Dense, Dropout, Input
 from keras.optimizers import Adam
 from keras.models import Sequential
-from tensorflow.python.estimator import keras
 
 from utils.logger import get_logger
 from utils.tracking_components.training_components.data_preparation import training_data
@@ -29,7 +28,7 @@ def monitor_usage():
 
 
 # Callback to monitor usage during training
-class MonitorCallback(keras.callbacks.Callback):
+class MonitorCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         monitor_usage()
 
