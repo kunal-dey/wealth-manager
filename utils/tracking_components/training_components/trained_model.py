@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import random
-import tensorflow as tf
+# import tensorflow as tf
 from keras.layers import Dense, Dropout, Input
 from keras.optimizers import Adam
 from keras.models import Sequential
@@ -65,14 +65,13 @@ def create_model(hl=2, hn=50, dropout=False, input_dim=None, rate=0.3):
 
 def train_model(stock_list):
 
-    data_df = training_data([f"{st}.NS" for st in stock_list])
+    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
 
     train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df)
 
     def set_seeds(seed=100):
         random.seed(seed)
         np.random.seed(seed)
-        tf.random.set_seed(seed)
 
     def cw(df):
         c0, c1 = np.bincount(df['dir'])
@@ -84,7 +83,7 @@ def train_model(stock_list):
     # train, train_s, test, test_s = split_data(split_ratio=split_ratio, data_df=data_df)
     features = list(train_s.columns[train_s.columns != 'dir'])
 
-    model = create_model(hn=3, dropout=True, input_dim=len(features))
+    model = create_model(hl=2, dropout=True, input_dim=len(features))
 
     logger.info("started fitting the model")
 
