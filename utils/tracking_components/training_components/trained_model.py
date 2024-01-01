@@ -8,6 +8,7 @@ import random
 
 import psutil as psutil
 import tensorflow as tf
+import keras
 from keras.layers import Dense, Dropout, Input
 from keras.optimizers import Adam
 from keras.models import Sequential
