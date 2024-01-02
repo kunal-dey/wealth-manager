@@ -95,12 +95,11 @@ async def train():
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 
+    def training():
+        train_model(obtained_stock_list)
 
-    # def training():
-    #     train_model(obtained_stock_list)
-    #
-    # # starting the training process
-    # app.add_background_task(training)
+    # starting the training process
+    app.add_background_task(training)
     return {"message": "Training started"}
 
 
