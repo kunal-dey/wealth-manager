@@ -81,6 +81,7 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
 
 
 def train_model(stock_list):
+    logger.info("data extraction")
     data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
 
     condition1 = (data_df['3d_return'] < 1)
