@@ -91,7 +91,7 @@ for resource in resource_list:
 
 @app.get("/train")
 async def train():
-    obtained_stock_list = await get_correct_symbol(lower_price=100, higher_price=150)
+    obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=800)
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 

@@ -7,7 +7,7 @@ import pandas as pd
 from constants.global_contexts import kite_context
 
 
-async def get_correct_symbol(lower_price=100, higher_price=300, initial_stock_list=None):
+async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_list=None):
     """
     Some symbol is trade to trade basis so-BE is attached at the end
     :param initial_stock_list: None
