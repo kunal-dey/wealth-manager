@@ -81,7 +81,6 @@ async def background_task():
         prediction_df.index = pd.to_datetime(prediction_df.index)
         prediction_df = prediction_df.loc[:str(TRAINING_DATE.date())]
         prediction_df.reset_index(drop=True, inplace=True)
-        prediction_df.to_csv(f"temp/prediction_df.csv")
 
     initial_list_of_holdings = list(account.holdings.keys())
     initial_list_of_stocks = list(account.stocks_to_track.keys())
