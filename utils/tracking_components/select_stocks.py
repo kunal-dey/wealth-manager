@@ -88,21 +88,32 @@ def predict_running_df(day_based_data, model, params):
     sigma = sigma.iloc[:-1]
 
     def predict_stocks(min_based_data):
-        data = {
-            '3mo_return': list(three_month),
-            '1mo_return': list(one_month),
-            '1wk_return': list(one_week),
-            '3d_return': list(three_days),
-            '1d_return': list(min_based_data.iloc[-375] / min_based_data.iloc[-1].values),
-            '2hr_return': list(min_based_data.iloc[-120] / min_based_data.iloc[-1].values),
-            '10m_return': list(min_based_data.iloc[-10] / min_based_data.iloc[-1].values),
-            '2hr_vol': list(min_based_data.iloc[-120:].std() / min_based_data.iloc[-120]),
-            '10m_vol': list(min_based_data.iloc[-10:].std() / min_based_data.iloc[-10])
-        }
-        running_df = pd.DataFrame(data, index=list((min_based_data.iloc[-375] / min_based_data.iloc[-1]).index))
+        running_df = pd.concat([
+            three_month,
+            one_month,
+            one_week,
+            three_days,
+            min_based_data.iloc[-375] / min_based_data.iloc[-1].values,
+            min_based_data.iloc[-120] / min_based_data.iloc[-1].values,
+            min_based_data.iloc[-10] / min_based_data.iloc[-1].values,
+            min_based_data.iloc[-120:].std() / min_based_data.iloc[-120],
+            min_based_data.iloc[-10:].std() / min_based_data.iloc[-10]
+        ], axis=1)
+        running_df.columns = [
+            '3mo_return',
+            '1mo_return',
+            '1wk_return',
+            '3d_return',
+            '1d_return',
+            '2hr_return',
+            '10m_return',
+            '2hr_vol',
+            '10m_vol'
+        ]
+        running_df.dropna(inplace=True)
         running_df_s = (running_df-mu)/sigma
         running_df['prob'] = model.predict(running_df_s)
-        running_df['position'] = np.where(running_df['prob'] > 0.95, 1, 0)
+        running_df['position'] = np.where(running_df['prob'] > 0.8, 1, 0)
 
         return list(running_df[running_df['position'] == 1].index)
 

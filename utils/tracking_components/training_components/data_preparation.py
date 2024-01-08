@@ -10,12 +10,12 @@ logger: Logger = get_logger(__name__)
 
 
 def generate_data(starting_tickers: list):
-    day_based_data = yf.download(tickers=starting_tickers, period='6mo', interval='1d', progress=False)['Close']
+    day_based_data = yf.download(tickers=starting_tickers, period='6mo', interval='1d')['Close']
     day_based_data.index = pd.to_datetime(day_based_data.index)
     day_based_data = day_based_data.loc[:TRAINING_DATE]
     day_based_data = day_based_data.ffill().bfill()
 
-    min_based_data = yf.download(tickers=starting_tickers, period='1wk', interval='1m', progress=False)['Close']
+    min_based_data = yf.download(tickers=starting_tickers, period='1wk', interval='1m')['Close']
     min_based_data.index = pd.to_datetime(min_based_data.index, utc=True)
     min_based_data = min_based_data.loc[:str(TRAINING_DATE.date())]
     min_based_data = min_based_data.ffill().bfill()
@@ -65,12 +65,12 @@ def training_data(non_be_tickers: list):
 
     # filter the stocks which are having both 6 month data as well 1 wk data
 
-    monthly_stocks = yf.download(tickers=non_be_tickers, interval='1d', period='6mo', progress=False)
+    monthly_stocks = yf.download(tickers=non_be_tickers, interval='1d', period='6mo')
     monthly_stocks.index = pd.to_datetime(monthly_stocks.index)
     monthly_stocks = monthly_stocks.loc[:TRAINING_DATE]
     monthly_stocks = monthly_stocks['Close'].bfill().ffill().dropna(axis=1)
 
-    wk_stocks = yf.download(tickers=non_be_tickers, interval='1m', period='1wk', progress=False)
+    wk_stocks = yf.download(tickers=non_be_tickers, interval='1m', period='1wk')
     wk_stocks.index = pd.to_datetime(wk_stocks.index, utc=True)
     wk_stocks = wk_stocks.loc[:str(TRAINING_DATE.date())]
     wk_stocks = wk_stocks['Close'].bfill().ffill().dropna(axis=1)
