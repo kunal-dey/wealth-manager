@@ -16,7 +16,7 @@ from utils.tracking_components.fetch_prices import fetch_current_prices
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
     set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE
-from utils.tracking_components.select_stocks import select_stocks, predict_running_df
+from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
 logger: Logger = get_logger(__name__)

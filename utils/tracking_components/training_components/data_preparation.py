@@ -9,16 +9,7 @@ from utils.logger import get_logger
 logger: Logger = get_logger(__name__)
 
 
-def generate_data(starting_tickers: list):
-    day_based_data = yf.download(tickers=starting_tickers, period='6mo', interval='1d')['Close']
-    day_based_data.index = pd.to_datetime(day_based_data.index)
-    day_based_data = day_based_data.loc[:TRAINING_DATE]
-    day_based_data = day_based_data.ffill().bfill()
-
-    min_based_data = yf.download(tickers=starting_tickers, period='1wk', interval='1m')['Close']
-    min_based_data.index = pd.to_datetime(min_based_data.index, utc=True)
-    min_based_data = min_based_data.loc[:str(TRAINING_DATE.date())]
-    min_based_data = min_based_data.ffill().bfill()
+def generate_data(day_based_data, min_based_data):
 
     def position(x):
         """
@@ -27,7 +18,7 @@ def generate_data(starting_tickers: list):
         :return:
         """
         returns = (x.pct_change()+1).cumprod()
-        return 0 if returns[returns > 1.02].shape[0] == 0 else 1
+        return 0 if returns[returns > 1.007].shape[0] == 0 else 1
 
     def filtered_single_stock_data(stock_name: str):
         stock_df = min_based_data[[stock_name]].copy()
@@ -52,7 +43,7 @@ def generate_data(starting_tickers: list):
         stock_df['2hr_vol'] = stock_df['price'].rolling(120).apply(lambda x: x.std()/x.iloc[0])
         stock_df['10m_vol'] = stock_df['price'].rolling(10).apply(lambda x: x.std()/x.iloc[0])
         stock_df['1m_shift'] = stock_df.price.shift(1)
-        stock_df['dir'] = stock_df['1m_shift'].shift(-375).rolling(375).apply(lambda x: position(x))
+        stock_df['dir'] = stock_df['1m_shift'].shift(-124).rolling(124).apply(lambda x: position(x))
         return stock_df.dropna()[['3mo_return', '1mo_return', '1wk_return', '3d_return', '1d_return', '2hr_return', '10m_return', '2hr_vol', '10m_vol', 'dir']].reset_index(drop=True)
     return filtered_single_stock_data
 
@@ -82,7 +73,7 @@ def training_data(non_be_tickers: list):
                 stocks_list.append(a)
 
     # generating the dataframe having both the input and output
-    filtered_single_stock_data = generate_data(stocks_list)
+    filtered_single_stock_data = generate_data(monthly_stocks[stocks_list], wk_stocks[stocks_list])
 
     data_df = None
     for st in stocks_list:
