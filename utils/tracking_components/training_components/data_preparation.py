@@ -18,7 +18,7 @@ def generate_data(day_based_data, min_based_data):
         :return:
         """
         returns = (x.pct_change()+1).cumprod()
-        return 0 if returns[returns > 1.007].shape[0] == 0 else 1
+        return 0 if returns[returns > 1.01].shape[0] == 0 else 1
 
     def filtered_single_stock_data(stock_name: str):
         stock_df = min_based_data[[stock_name]].copy()
@@ -43,7 +43,7 @@ def generate_data(day_based_data, min_based_data):
         stock_df['2hr_vol'] = stock_df['price'].rolling(120).apply(lambda x: x.std()/x.iloc[0])
         stock_df['10m_vol'] = stock_df['price'].rolling(10).apply(lambda x: x.std()/x.iloc[0])
         stock_df['1m_shift'] = stock_df.price.shift(1)
-        stock_df['dir'] = stock_df['1m_shift'].shift(-124).rolling(124).apply(lambda x: position(x))
+        stock_df['dir'] = stock_df['1m_shift'].shift(-150).rolling(150).apply(lambda x: position(x))
         return stock_df.dropna()[['3mo_return', '1mo_return', '1wk_return', '3d_return', '1d_return', '2hr_return', '10m_return', '2hr_vol', '10m_vol', 'dir']].reset_index(drop=True)
     return filtered_single_stock_data
 

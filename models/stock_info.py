@@ -180,7 +180,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.03 < self.last_buy_price:
+            if self.latest_price*1.05 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
@@ -188,6 +188,6 @@ class StockInfo:
                     stock_df = self.__result_stock_df.copy()
                     # stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
                     stock_df.insert(1, "min", stock_df['price'].rolling(window=60).min())
-                    if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.002:
+                    if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.005:
                         return True
         return False
