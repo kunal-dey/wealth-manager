@@ -83,11 +83,6 @@ async def stop_background_tasks():
     logger.info("STOPPED ALL BACKGROUND SERVICES")
     return {"message": "All task cancelled"}
 
-resource_list: list[Blueprint] = [stocks_input]
-
-for resource in resource_list:
-    app.register_blueprint(blueprint=resource)
-
 
 @app.get("/train")
 async def train():
@@ -103,6 +98,23 @@ async def train():
     return {"message": "Training started"}
 
 
+@app.get("/buy")
+async def buy():
+    response = kite_context.place_order(
+                variety=kite_context.VARIETY_REGULAR,
+                order_type=kite_context.ORDER_TYPE_LIMIT,
+                exchange=kite_context.EXCHANGE_NSE,
+                tradingsymbol="ARTNIRMAN-BE",
+                transaction_type=kite_context.TRANSACTION_TYPE_SELL,
+                quantity=1,
+                price=71.20,
+                product=kite_context.PRODUCT_CNC,
+                validity=kite_context.VALIDITY_DAY
+            )
+    print(response)
+    return {"msg": ""}
+
+
 @app.get("/predict")
 async def predict():
     # obtained_stock_list = await get_correct_symbol()
@@ -114,6 +126,10 @@ async def predict():
     logger.info(mu.iloc[:-1])
     return {"msg": "try"}
 
+resource_list: list[Blueprint] = [stocks_input]
+
+for resource in resource_list:
+    app.register_blueprint(blueprint=resource)
 
 if __name__ == "__main__":
     app.run(port=8081)

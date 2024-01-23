@@ -1,12 +1,12 @@
 from datetime import datetime
 
-DEBUG = False
+DEBUG = True
 
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2024, 1, 15) if DEBUG else datetime.now()
-TRAINING_DATE = datetime(2024, 1, 12) if DEBUG else datetime.now()
+TODAY = datetime(2024, 1, 23) if DEBUG else datetime.now()
+TRAINING_DATE = datetime(2024, 1, 23) if DEBUG else datetime.now()
 
 GENERATOR_URL = '127.0.0.1:8082'
 

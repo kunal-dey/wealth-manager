@@ -42,7 +42,7 @@ def predict_running_df(day_based_data, model, params):
         running_df.dropna(inplace=True)
         running_df_s = (running_df-mu)/sigma
         running_df['prob'] = model.predict(running_df_s)
-        running_df['position'] = np.where((running_df['prob'] > 0.7) & (running_df['prob'] < 0.9), 1, 0)
+        running_df['position'] = np.where(running_df['prob'] > 0.8, 1, 0)
 
         return list(running_df[running_df['position'] == 1].index)
 

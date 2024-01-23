@@ -83,12 +83,9 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
 def train_model(stock_list):
     logger.info("data extraction")
     data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
-
-    condition1 = (data_df['3d_return'] < 1)
-    condition3 = (data_df['1wk_return'] < 1)
-    condition4 = (data_df['3mo_return'] < 1)
-    condition6 = (data_df['10m_return'] > 1)
-    data_df = data_df[condition1 & condition3 & condition4 & condition6]
+    # condition1 = (data_df['3mo_return'] > 0)
+    # condition2 = (data_df['1mo_return'] > 0)
+    # data_df = data_df[condition1 & condition2]
 
     logger.info(f"size: {data_df.shape}")
 
