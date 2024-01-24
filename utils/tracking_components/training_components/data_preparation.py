@@ -63,17 +63,15 @@ def training_data(non_be_tickers: list):
 
     # filter the stocks which are having both 6 month data as well 1 wk data
 
-    monthly_stocks = yf.download(tickers=non_be_tickers[:2], interval='1d', period='6mo')
+    monthly_stocks = yf.download(tickers=non_be_tickers, interval='1d', period='6mo')
     monthly_stocks.index = pd.to_datetime(monthly_stocks.index)
     monthly_stocks = monthly_stocks.loc[:TRAINING_DATE]
     monthly_stocks = monthly_stocks['Close'].bfill().ffill().dropna(axis=1)
 
-    wk_stocks = yf.download(tickers=non_be_tickers[:2], interval='1m', period='1wk')
+    wk_stocks = yf.download(tickers=non_be_tickers, interval='1m', period='1wk')
     wk_stocks.index = pd.to_datetime(wk_stocks.index, utc=True)
     wk_stocks = wk_stocks.loc[:str(TRAINING_DATE.date())]
     wk_stocks = wk_stocks['Close'].bfill().ffill().dropna(axis=1)
-    logger.info(f"monthly {monthly_stocks}")
-    wk_stocks.to_csv("test.csv")
 
     stocks_list = []
     for a in list(monthly_stocks.columns):

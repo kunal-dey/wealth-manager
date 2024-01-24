@@ -1,11 +1,11 @@
 from datetime import datetime
 
-DEBUG = True
+DEBUG = False
 
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2024, 1, 23) if DEBUG else datetime.now()
+TODAY = datetime(2024, 1, 24) if DEBUG else datetime.now()
 TRAINING_DATE = datetime(2024, 1, 23) if DEBUG else datetime.now()
 
 GENERATOR_URL = '127.0.0.1:8082'
@@ -26,7 +26,7 @@ SLEEP_INTERVAL = 1 if DEBUG else 45
 # expected returns are set in this section
 DELIVERY_INITIAL_RETURN = 0.0003334
 DELIVERY_INCREMENTAL_RETURN = 0.006
-DAILY_MINIMUM_RETURN = 0.01
+DAILY_MINIMUM_RETURN = 0.006
 
 INTRADAY_INITIAL_RETURN = 0.00033
 INTRADAY_INCREMENTAL_RETURN = 0.006

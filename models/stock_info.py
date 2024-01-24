@@ -122,7 +122,7 @@ class StockInfo:
 
     def buy_parameters(self):
         if self.first_load:
-            amount: float = self.remaining_allocation/3
+            amount: float = self.remaining_allocation/2
         else:
             amount: float = self.remaining_allocation
 

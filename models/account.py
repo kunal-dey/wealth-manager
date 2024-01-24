@@ -85,7 +85,7 @@ class Account:
                                 quantity=int(quantity),
                                 product_type=ProductType.DELIVERY
                             )
-                            self.stocks_to_track[stock_key].remaining_allocation -= self.stocks_to_track[stock_key].remaining_allocation/3
+                            self.stocks_to_track[stock_key].remaining_allocation -= self.stocks_to_track[stock_key].remaining_allocation/2
                         else:
                             num = self.stocks_to_track[stock_key].last_buy_price*self.stocks_to_track[stock_key].last_quantity + buy_price * quantity
                             total_quantity = self.stocks_to_track[stock_key].last_quantity + quantity
