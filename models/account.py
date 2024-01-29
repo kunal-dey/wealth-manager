@@ -10,7 +10,7 @@ from models.stages.holding import Holding
 from models.stages.position import Position
 from models.stock_info import StockInfo
 from utils.logger import get_logger
-from utils.take_position import long
+from utils.take_position import long, short
 
 logger: Logger = get_logger(__name__)
 
@@ -27,9 +27,11 @@ def get_available_cash():
 class Account:
     stocks_to_track: dict[str, StockInfo] = field(default_factory=dict, init=False)
     positions: dict[str, Position] = field(default_factory=dict, init=False)
+    short_positions: dict[str, Position] = field(default_factory=dict, init=False)
     holdings: dict[str, Holding] = field(default_factory=dict, init=False)
     available_cash: float = field(default_factory=get_available_cash)
     starting_cash: float = field(default_factory=get_available_cash)
+    short_stocks_to_track: dict[str, StockInfo] = field(default_factory=dict, init=False)
 
     async def load_holdings(self):
         """
@@ -53,7 +55,6 @@ class Account:
         """
         for stock_key in list(self.stocks_to_track.keys()):
             logger.info(f"{stock_key}: allocation {self.stocks_to_track[stock_key].remaining_allocation}")
-            # if stock_key not in self.positions.keys() and stock_key not in self.holdings.keys():
             if self.stocks_to_track[stock_key].remaining_allocation > 0:
                 if not DEBUG:
                     sell_orders: list = self.stocks_to_track[stock_key].get_quote["sell"]
@@ -79,19 +80,19 @@ class Account:
 
                         if self.stocks_to_track[stock_key].first_load:
                             self.positions[stock_key] = Position(
-                                buy_price=buy_price,
+                                position_price=buy_price,
                                 stock=self.stocks_to_track[stock_key],
                                 position_type=PositionType.LONG,
                                 quantity=int(quantity),
                                 product_type=ProductType.DELIVERY
                             )
-                            self.stocks_to_track[stock_key].remaining_allocation -= self.stocks_to_track[stock_key].remaining_allocation/2
+                            self.stocks_to_track[stock_key].remaining_allocation -= self.stocks_to_track[stock_key].remaining_allocation*(2/3)
                         else:
                             num = self.stocks_to_track[stock_key].last_buy_price*self.stocks_to_track[stock_key].last_quantity + buy_price * quantity
                             total_quantity = self.stocks_to_track[stock_key].last_quantity + quantity
                             avg_price = num/total_quantity
                             self.positions[stock_key] = Position(
-                                buy_price=avg_price,
+                                position_price=avg_price,
                                 stock=self.stocks_to_track[stock_key],
                                 position_type=PositionType.LONG,
                                 quantity=int(total_quantity),
@@ -107,6 +108,27 @@ class Account:
                         self.stocks_to_track[stock_key].last_buy_price = buy_price
                         self.stocks_to_track[stock_key].last_quantity = quantity
 
+    def short_stocks(self):
+        for stock_key in list(self.stocks_to_track.keys()):
+            if not self.stocks_to_track[stock_key].first_load and self.stocks_to_track[stock_key].remaining_allocation > 0:
+                quantity, sell_price = self.stocks_to_track[stock_key].short_parameters()
+                if stock_key in self.positions.keys() and stock_key not in self.short_positions.keys():
+                    if self.stocks_to_track[stock_key].whether_short():
+                        if short(
+                            symbol=self.stocks_to_track[stock_key].stock_name,
+                            quantity=int(quantity),
+                            product_type=ProductType.INTRADAY,
+                            exchange=self.stocks_to_track[stock_key].exchange
+                        ):
+                            logger.info(f"{self.stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
+                            self.short_positions[stock_key] = Position(
+                                    position_price=sell_price,
+                                    stock=self.stocks_to_track[stock_key],
+                                    position_type=PositionType.SHORT,
+                                    quantity=int(quantity),
+                                    product_type=ProductType.INTRADAY
+                                )
+
     def convert_positions_to_holdings(self):
         """
         This method converts all the positions of the day into holdings which can be loaded next day.
@@ -118,7 +140,7 @@ class Account:
         for position_key in self.positions.keys():
             position = self.positions[position_key]
             self.holdings[position_key] = Holding(
-                buy_price=position.buy_price,
+                position_price=position.position_price,
                 quantity=position.quantity,
                 product_type=position.product_type,
                 position_type=position.position_type,
@@ -136,7 +158,7 @@ class Account:
         for holding_key in self.holdings.keys():
             holding = self.holdings[holding_key]
             self.positions[holding_key] = Position(
-                buy_price=holding.buy_price,
+                position_price=holding.position_price,
                 quantity=holding.quantity,
                 product_type=holding.product_type,
                 position_type=holding.position_type,

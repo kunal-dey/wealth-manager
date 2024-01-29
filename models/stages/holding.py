@@ -16,7 +16,7 @@ from constants.settings import DELIVERY_INCREMENTAL_RETURN
 def get_schema():
     return {
         "_id": "ObjectId",
-        "buy_price": "float",
+        "position_price": "float",
         "quantity": "int",
         "product_type": ProductType,
         "position_type": PositionType,

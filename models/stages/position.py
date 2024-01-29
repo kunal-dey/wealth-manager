@@ -1,4 +1,4 @@
-from  dataclasses import  dataclass
+from dataclasses import dataclass
 
 from models.stock_stage import Stage
 from models.stock_info import StockInfo
@@ -13,4 +13,7 @@ class Position(Stage):
 
     @property
     def incremental_return(self):
-        return INTRADAY_INCREMENTAL_RETURN
+        if self.position_type == PositionType.LONG:
+            return INTRADAY_INCREMENTAL_RETURN
+        else:
+            return 0.006

@@ -3,14 +3,20 @@ from logging import Logger
 from time import sleep
 from dataclasses import dataclass, field
 from typing import Callable
+import numpy as np
 
 import requests
 import pandas as pd
 from bson import ObjectId
+from dateutil.rrule import rrule, WEEKLY, MO, TU, WE, TH, FR
+from utils.exclude_dates import load_holidays
 
 from constants.global_contexts import kite_context
 from constants.settings import DEBUG, set_end_process, TODAY
 from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
+from models.costs.delivery_trading_cost import DeliveryTransactionCost
+from models.costs.intraday_trading_cost import IntradayTransactionCost
+from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
 from constants.settings import GENERATOR_URL
 
@@ -98,6 +104,36 @@ class StockInfo:
             retries += 1
         return None
 
+    @property
+    def number_of_days(self):
+        dtstart, until = self.created_at.date(), TODAY.date()
+        days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dtstart, until=until).count()
+        for day in load_holidays()['dates']:
+            if dtstart < day.date() < until:
+                days -= 1
+        return days
+
+    def transaction_cost(self, buying_price, selling_price, short=False) -> float:
+        if short:
+            return IntradayTransactionCost(
+                    buying_price=buying_price,
+                    selling_price=selling_price,
+                    quantity=self.quantity
+                ).total_tax_and_charges
+        else:
+            if self.number_of_days > 1:
+                return DeliveryTransactionCost(
+                    buying_price=buying_price,
+                    selling_price=selling_price,
+                    quantity=self.quantity
+                ).total_tax_and_charges
+            else:
+                return IntradayTransactionCost(
+                    buying_price=buying_price,
+                    selling_price=selling_price,
+                    quantity=self.quantity
+                ).total_tax_and_charges
+
     def update_price(self):
         """
         This is required to update the latest price.
@@ -122,7 +158,7 @@ class StockInfo:
 
     def buy_parameters(self):
         if self.first_load:
-            amount: float = self.remaining_allocation/2
+            amount: float = self.remaining_allocation*(2/3)
         else:
             amount: float = self.remaining_allocation
 
@@ -145,6 +181,30 @@ class StockInfo:
                 self.quantity, price = 0, 0
         else:
             self.quantity, price = get_quantity_and_price(sell_orders)
+        return self.quantity, price
+
+    def short_parameters(self):
+        amount: float = self.remaining_allocation
+
+        def get_quantity_and_price(b_orders):
+            accumulated, quantity = 0, 0
+            for item in b_orders:
+                for order_no in range(1, item["orders"] + 1):
+                    for _ in range(1, item["quantity"] + 1):
+                        if accumulated + item["price"] > amount:
+                            return quantity, accumulated/quantity
+                        accumulated += item["price"]
+                        quantity += 1
+            return quantity, accumulated / quantity
+        quote: dict = self.get_quote
+        buy_orders: list = quote["buy"]
+        if DEBUG:
+            if self.latest_price:
+                self.quantity, price = int(amount/self.latest_price), self.latest_price
+            else:
+                self.quantity, price = 0, 0
+        else:
+            self.quantity, price = get_quantity_and_price(buy_orders)
         return self.quantity, price
 
     def update_stock_df(self, current_price: float):
@@ -180,7 +240,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.05 < self.last_buy_price:
+            if self.latest_price*1.1 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
@@ -191,3 +251,31 @@ class StockInfo:
                     if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.005:
                         return True
         return False
+
+    def whether_short(self) -> bool:
+
+        def get_slope(col):
+            index = list(col.index)
+            coefficient = np.polyfit(index, col.values, 1)
+            ini = coefficient[0]*index[0]+coefficient[1]
+            return coefficient[0]/ini
+
+        buy_cost = self.last_buy_price + self.transaction_cost(
+            buying_price=self.last_buy_price,
+            selling_price=self.latest_price,
+            short=True
+        )/self.last_quantity
+
+        if self.latest_price * 1.008 < buy_cost and self.latest_price * 1.09 > self.last_buy_price:
+            if self.__result_stock_df.shape[0] > 60:
+                logger.info("short selection entered")
+                stock_df = self.__result_stock_df.copy()
+                line = stock_df.apply(kaufman_indicator)
+                transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
+                logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
+                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < transformed.shift(2).price.iloc[-1]:
+                    logger.info("should return true")
+                    return True
+        return False
+
+

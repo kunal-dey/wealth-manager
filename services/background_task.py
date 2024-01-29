@@ -15,7 +15,7 @@ from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
-    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE
+    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE, BUY_SHORTS
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -226,10 +226,9 @@ async def background_task():
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
                     try:
                         account.buy_stocks()
+                        account.short_stocks()
                     except:
                         pass
-
-
 
                 """
                     if the trigger for selling is breached in position then sell
@@ -246,8 +245,7 @@ async def background_task():
                             positions_to_delete.append(position_name)
                             logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
                             account.available_cash += get_allocation()
-                            today_profit += float(account.stocks_to_track[position_name].wallet)
-                            del account.stocks_to_track[position_name]  # delete from stocks to track
+
                         case "DAYNBREACHED":
                             logger.info(f" DAYNBREACHED -->sell {position.stock.stock_name} at {position.stock.latest_price}")
                             positions_to_delete.append(position_name)
@@ -256,15 +254,67 @@ async def background_task():
                             # if one third amount breaches then remaining two third cash can be used
                             if account.stocks_to_track[position_name].remaining_allocation > 0:
                                 account.available_cash += account.stocks_to_track[position_name].remaining_allocation
-
-                            today_profit += float(account.stocks_to_track[position_name].wallet)
-                            del account.stocks_to_track[position_name]  # delete from stocks to track
                         case "CONTINUE":
                             continue
 
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
-                    os.remove(f"temp/{position_name}.csv")
+                    today_profit += float(account.stocks_to_track[position_name].wallet)
+                    if position_name in account.short_positions.keys():
+                        account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
+                        del account.stocks_to_track[position_name]  # delete from stocks to track
+                    else:
+                        del account.stocks_to_track[position_name]  # delete from stocks to track
+                        os.remove(f"temp/{position_name}.csv")
+
+                for stock in account.short_stocks_to_track.keys():
+                    account.short_stocks_to_track[stock].update_price()
+
+                """
+                    if the trigger for buying short positions are breached in short position then buy
+                """
+
+                short_positions_to_delete = []  # this is needed or else it will alter the length during loop
+
+                for short_position_name in account.short_positions.keys():
+                    short_position: Position = account.short_positions[short_position_name]
+                    status = short_position.breached()
+                    match status:
+                        case "SQUARED_OFF":
+                            logger.info(f" SQUARED OFF SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                            short_positions_to_delete.append(short_position_name)
+                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                        case "LOSS":
+                            logger.info(f" LOSS SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                            short_positions_to_delete.append(short_position_name)
+                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                        case "BUY_ANOTHER":
+                            logger.info(f" BUY ANOTHER SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                            short_positions_to_delete.append(short_position_name)
+                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                        case "CONTINUE":
+                            continue
+
+                for short_position_name in short_positions_to_delete:
+                    del account.short_positions[short_position_name]
+
+                if current_time > BUY_SHORTS:
+                    short_positions_to_delete_at_end = []
+                    for short_position_name in account.short_positions.keys():
+                        short_position: Position = account.short_positions[short_position_name]
+                        if short_position.buy_short():
+                            today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                            short_positions_to_delete_at_end.append(short_position_name)
+                        else:
+                            logger.info(f"Error occurred while deleting {short_position_name}")
+
+                    for short_position_name in short_positions_to_delete_at_end:
+                        if short_position_name in account.short_stocks_to_track.keys():
+                            os.remove(f"temp/{short_position_name}.csv")
+                        del account.short_positions[short_position_name]
 
         except:
             logger.exception("Kite error may have happened")
@@ -289,8 +339,8 @@ async def background_task():
                     today_profit += float(account.stocks_to_track[position_name].wallet)
                     del account.stocks_to_track[position_name]  # delete from stocks to track
             else:
-                tx_cost = position.transaction_cost(buying_price=position.buy_price, selling_price=position.current_price) / position.quantity
-                wallet_value = (position.current_price - (position.buy_price + tx_cost)) * position.quantity
+                tx_cost = position.stock.transaction_cost(buying_price=position.position_price, selling_price=position.current_price) / position.quantity
+                wallet_value = (position.current_price - (position.position_price + tx_cost)) * position.quantity
                 wallet_order[wallet_value] = position_name
         else:
             if position.sell():
