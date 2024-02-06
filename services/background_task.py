@@ -36,6 +36,7 @@ async def background_task():
 
     prediction_df, obtained_stock_list = None, await get_correct_symbol()
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
+    logger.info(f"test{obtained_stock_list}")
 
     not_loaded = True
     filtered_stocks, selected_stocks = [], []

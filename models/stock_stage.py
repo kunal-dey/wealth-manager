@@ -208,7 +208,7 @@ class Stage:
             logger.info(f"Wallet: {wallet_value}")
             logger.info(f"{self.stock.stock_name} Earlier short trigger:  {self.trigger}, latest price:{self.current_price}")
             if self.trigger is not None:
-                if self.stock.last_buy_price * 1.015 < self.current_price:
+                if self.stock.last_buy_price * 1.005 < self.current_price:
                     if DEBUG:
                         if self.buy_short():
                             return "LOSS"
@@ -217,7 +217,7 @@ class Stage:
                         if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
                             if self.buy_short():
                                 return "LOSS"
-                if self.stock.latest_price * 1.09 < self.stock.last_buy_price:
+                if self.stock.latest_price * 1.08 < self.stock.last_buy_price:
                     if DEBUG:
                         if self.buy_short():
                             return "BUY_ANOTHER"

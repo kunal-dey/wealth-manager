@@ -266,14 +266,16 @@ class StockInfo:
             short=True
         )/self.last_quantity
 
-        if self.latest_price * 1.008 < buy_cost and self.latest_price * 1.09 > self.last_buy_price:
+        logger.info(f"latest price {self.latest_price}, buy_cost {buy_cost}")
+
+        if self.latest_price * 1.002 < self.last_buy_price < self.latest_price * 1.09:
             if self.__result_stock_df.shape[0] > 60:
                 logger.info("short selection entered")
                 stock_df = self.__result_stock_df.copy()
                 line = stock_df.apply(kaufman_indicator)
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
                 logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
-                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < transformed.shift(2).price.iloc[-1]:
+                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1]:
                     logger.info("should return true")
                     return True
         return False

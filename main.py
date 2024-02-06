@@ -1,5 +1,3 @@
-import os
-import pickle
 from logging import Logger
 
 from quart import Quart, request, Blueprint
@@ -8,8 +6,6 @@ from kiteconnect.exceptions import InputException
 from datetime import datetime
 
 from constants.global_contexts import set_access_token
-from models.db_models.db_functions import find_by_name
-from models.stages.holding import Holding
 
 from services.background_task import background_task
 from constants.global_contexts import kite_context
@@ -96,35 +92,6 @@ async def train():
     # starting the training process
     app.add_background_task(training)
     return {"message": "Training started"}
-
-
-@app.get("/buy")
-async def buy():
-    response = kite_context.place_order(
-                variety=kite_context.VARIETY_REGULAR,
-                order_type=kite_context.ORDER_TYPE_LIMIT,
-                exchange=kite_context.EXCHANGE_NSE,
-                tradingsymbol="ARTNIRMAN-BE",
-                transaction_type=kite_context.TRANSACTION_TYPE_SELL,
-                quantity=1,
-                price=71.20,
-                product=kite_context.PRODUCT_CNC,
-                validity=kite_context.VALIDITY_DAY
-            )
-    print(response)
-    return {"msg": ""}
-
-
-@app.get("/predict")
-async def predict():
-    # obtained_stock_list = await get_correct_symbol()
-    # logger.info(obtained_stock_list)
-    # message = train_model(obtained_stock_list)
-    params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
-    mu, sigma = params
-
-    logger.info(mu.iloc[:-1])
-    return {"msg": "try"}
 
 resource_list: list[Blueprint] = [stocks_input]
 
