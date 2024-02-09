@@ -306,9 +306,14 @@ async def background_task():
                     short_positions_to_delete_at_end = []
                     for short_position_name in account.short_positions.keys():
                         short_position: Position = account.short_positions[short_position_name]
+
                         if short_position.buy_short():
-                            today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
-                            short_positions_to_delete_at_end.append(short_position_name)
+                            if short_position_name in account.short_stocks_to_track.keys():
+                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                                short_positions_to_delete_at_end.append(short_position_name)
+                            else:
+                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                                short_positions_to_delete_at_end.append(short_position_name)
                         else:
                             logger.info(f"Error occurred while deleting {short_position_name}")
 
