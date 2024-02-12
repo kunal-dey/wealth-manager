@@ -44,7 +44,7 @@ class StockInfo:
     wallet: float = field(default=0.0)
     _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="StockInfo", init=False)
-    COLLECTION: str = field(default="stock", init=False)
+    COLLECTION: str = field(default="stock_dbg" if DEBUG else "stock", init=False)
     latest_price: float = field(default=None, init=False)
     created_at: datetime = field(default=TODAY)
     __result_stock_df: pd.DataFrame | None = field(default=None, init=False)
@@ -67,8 +67,15 @@ class StockInfo:
 
     @property
     def get_quote(self):
-        return kite_context.quote([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"][
+        retries = 0
+        while retries < 4:
+            try:
+                return kite_context.quote([f"{self.exchange}:{self.stock_name}"])[f"{self.exchange}:{self.stock_name}"][
                     "depth"]
+            except:
+                sleep(1)
+                retries += 1
+        return None
 
     @property
     def current_price(self):
@@ -116,10 +123,10 @@ class StockInfo:
     def transaction_cost(self, buying_price, selling_price, short=False) -> float:
         if short:
             return IntradayTransactionCost(
-                    buying_price=buying_price,
-                    selling_price=selling_price,
-                    quantity=self.quantity
-                ).total_tax_and_charges
+                buying_price=buying_price,
+                selling_price=selling_price,
+                quantity=self.quantity
+            ).total_tax_and_charges
         else:
             if self.number_of_days > 1:
                 return DeliveryTransactionCost(
@@ -153,12 +160,11 @@ class StockInfo:
         if current_price is not None:
             self.latest_price = current_price
         if self.latest_price is not None:
-
             self.update_stock_df(self.latest_price)
 
     def buy_parameters(self):
         if self.first_load:
-            amount: float = self.remaining_allocation*(2/3)
+            amount: float = self.remaining_allocation * (2 / 3)
         else:
             amount: float = self.remaining_allocation
 
@@ -168,15 +174,16 @@ class StockInfo:
                 for order_no in range(1, item["orders"] + 1):
                     for _ in range(1, item["quantity"] + 1):
                         if accumulated + item["price"] > amount:
-                            return quantity, accumulated/quantity
+                            return quantity, accumulated / quantity
                         accumulated += item["price"]
                         quantity += 1
             return quantity, accumulated / quantity
+
         quote: dict = self.get_quote
         sell_orders: list = quote["sell"]
         if DEBUG:
             if self.latest_price:
-                self.quantity, price = int(amount/self.latest_price), self.latest_price
+                self.quantity, price = int(amount / self.latest_price), self.latest_price
             else:
                 self.quantity, price = 0, 0
         else:
@@ -192,15 +199,16 @@ class StockInfo:
                 for order_no in range(1, item["orders"] + 1):
                     for _ in range(1, item["quantity"] + 1):
                         if accumulated + item["price"] > amount:
-                            return quantity, accumulated/quantity
+                            return quantity, accumulated / quantity
                         accumulated += item["price"]
                         quantity += 1
             return quantity, accumulated / quantity
+
         quote: dict = self.get_quote
         buy_orders: list = quote["buy"]
         if DEBUG:
             if self.latest_price:
-                self.quantity, price = int(amount/self.latest_price), self.latest_price
+                self.quantity, price = int(amount / self.latest_price), self.latest_price
             else:
                 self.quantity, price = 0, 0
         else:
@@ -240,7 +248,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price*1.1 < self.last_buy_price:
+            if self.latest_price * 1.1 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
@@ -257,14 +265,14 @@ class StockInfo:
         def get_slope(col):
             index = list(col.index)
             coefficient = np.polyfit(index, col.values, 1)
-            ini = coefficient[0]*index[0]+coefficient[1]
-            return coefficient[0]/ini
+            ini = coefficient[0] * index[0] + coefficient[1]
+            return coefficient[0] / ini
 
         buy_cost = self.last_buy_price + self.transaction_cost(
             buying_price=self.last_buy_price,
             selling_price=self.latest_price,
             short=True
-        )/self.last_quantity
+        ) / self.last_quantity
 
         logger.info(f"latest price {self.latest_price}, buy_cost {buy_cost}")
 
@@ -279,5 +287,3 @@ class StockInfo:
                     logger.info("should return true")
                     return True
         return False
-
-

@@ -10,7 +10,7 @@ from models.stock_info import StockInfo
 from models.stock_stage import Stage
 from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
 
-from constants.settings import DELIVERY_INCREMENTAL_RETURN
+from constants.settings import DELIVERY_INCREMENTAL_RETURN, DEBUG
 
 
 def get_schema():
@@ -28,7 +28,7 @@ def get_schema():
 class Holding(Stage):
     _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="Holding", init=False)
-    COLLECTION: str = field(default="holding", init=False)
+    COLLECTION: str = field(default="holding_dbg" if DEBUG else "holding", init=False)
     save_to_db: Callable = field(default=None, init=False)
     delete_from_db: Callable = field(default=None, init=False)
     update_in_db: Callable = field(default=None, init=False)

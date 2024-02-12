@@ -5,8 +5,8 @@ DEBUG = False
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2024, 1, 25) if DEBUG else datetime.now()
-TRAINING_DATE = datetime(2024, 1, 23) if DEBUG else datetime.now()
+TODAY = datetime(2024, 2, 9) if DEBUG else datetime.now()
+TRAINING_DATE = datetime(2024, 2, 8) if DEBUG else datetime.now()
 
 GENERATOR_URL = '127.0.0.1:8082'
 

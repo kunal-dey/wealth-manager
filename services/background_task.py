@@ -284,23 +284,37 @@ async def background_task():
                         case "SQUARED_OFF":
                             logger.info(f" SQUARED OFF SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
                             short_positions_to_delete.append(short_position_name)
-                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            if short_position_name in account.stocks_to_track.keys():
+                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            else:
+                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+
                         case "LOSS":
                             logger.info(f" LOSS SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
                             short_positions_to_delete.append(short_position_name)
-                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            if short_position_name in account.stocks_to_track.keys():
+                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            else:
+                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                         case "BUY_ANOTHER":
                             logger.info(f" BUY ANOTHER SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
                             short_positions_to_delete.append(short_position_name)
-                            logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                            today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            if short_position_name in account.stocks_to_track.keys():
+                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                            else:
+                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
+                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                         case "CONTINUE":
                             continue
 
                 for short_position_name in short_positions_to_delete:
                     del account.short_positions[short_position_name]
+                    os.remove(f"temp/{position_name}.csv")
 
                 if current_time > BUY_SHORTS:
                     short_positions_to_delete_at_end = []
@@ -324,6 +338,24 @@ async def background_task():
 
         except:
             logger.exception("Kite error may have happened")
+
+    if DEBUG:
+        short_positions_to_delete_at_end = []
+        for short_position_name in account.short_positions.keys():
+            short_position: Position = account.short_positions[short_position_name]
+            if short_position.buy_short():
+                if short_position_name in account.short_stocks_to_track.keys():
+                    today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                    short_positions_to_delete_at_end.append(short_position_name)
+                else:
+                    today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                    short_positions_to_delete_at_end.append(short_position_name)
+            else:
+                logger.info(f"Error occurred while deleting {short_position_name}")
+        for short_position_name in short_positions_to_delete_at_end:
+            if short_position_name in account.short_stocks_to_track.keys():
+                os.remove(f"temp/{short_position_name}.csv")
+            del account.short_positions[short_position_name]
 
     # sell all the stocks which has trigger and is not None
 

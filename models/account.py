@@ -58,6 +58,7 @@ class Account:
             if self.stocks_to_track[stock_key].remaining_allocation > 0:
                 if not DEBUG:
                     sell_orders: list = self.stocks_to_track[stock_key].get_quote["sell"]
+                    logger.info(f"{stock_key}: sell_orders {sell_orders}")
                     zero_quantity = True
                     for item in sell_orders:
                         if item['quantity'] > 0:
@@ -65,8 +66,10 @@ class Account:
                             break
                     if zero_quantity:
                         continue
+                logger.info(f"{stock_key}: get parameters")
 
                 quantity, buy_price = self.stocks_to_track[stock_key].buy_parameters()
+                logger.info(f"{stock_key}: {quantity} {buy_price}")
                 if self.stocks_to_track[stock_key].whether_buy():
                     if long(
                         symbol=self.stocks_to_track[stock_key].stock_name,
@@ -110,8 +113,12 @@ class Account:
 
     def short_stocks(self):
         for stock_key in list(self.stocks_to_track.keys()):
+            logger.info(f"{stock_key}: {self.stocks_to_track[stock_key].first_load} {self.stocks_to_track[stock_key].remaining_allocation}")
             if not self.stocks_to_track[stock_key].first_load and self.stocks_to_track[stock_key].remaining_allocation > 0:
+                logger.info(f"{stock_key}: get short parameters")
                 quantity, sell_price = self.stocks_to_track[stock_key].short_parameters()
+                logger.info(f"{stock_key}: {quantity} {sell_price}")
+                logger.info(f"{stock_key}: condition {self.positions.keys()} {self.short_positions.keys()}")
                 if stock_key in self.positions.keys() and stock_key not in self.short_positions.keys():
                     if self.stocks_to_track[stock_key].whether_short():
                         if short(
