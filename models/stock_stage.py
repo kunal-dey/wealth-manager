@@ -207,28 +207,26 @@ class Stage:
             wallet_value = selling_price - (buy_price + tx_cost)
             logger.info(f"Wallet: {wallet_value}")
             logger.info(f"{self.stock.stock_name} Earlier short trigger:  {self.trigger}, latest price:{self.current_price}")
-            if self.trigger is not None:
-                logger.info(f"check if loss is entered {self.stock.last_buy_price} {self.current_price}")
-                if self.stock.last_buy_price * 1.005 < self.current_price:
-                    if DEBUG:
+            if self.stock.last_buy_price * 1.005 < self.current_price:
+                if DEBUG:
+                    if self.buy_short():
+                        return "LOSS"
+                else:
+                    s_orders: list = self.stock.get_quote["sell"]
+                    if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
                         if self.buy_short():
                             return "LOSS"
-                    else:
-                        logger.info(f"it entered in loss logic")
-                        s_orders: list = self.stock.get_quote["sell"]
-                        logger.info(f"sell issue {sum([order['orders'] * order['quantity'] for order in s_orders])} {self.quantity}")
-                        if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                            if self.buy_short():
-                                return "LOSS"
-                if self.stock.latest_price * 1.08 < self.stock.last_buy_price:
-                    if DEBUG:
+
+            if self.stock.latest_price * 1.08 < self.stock.last_buy_price:
+                if DEBUG:
+                    if self.buy_short():
+                        return "BUY_ANOTHER"
+                else:
+                    s_orders: list = self.stock.get_quote["sell"]
+                    if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
                         if self.buy_short():
                             return "BUY_ANOTHER"
-                    else:
-                        s_orders: list = self.stock.get_quote["sell"]
-                        if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                            if self.buy_short():
-                                return "BUY_ANOTHER"
+            if self.trigger is not None:
                 if self.current_price > self.trigger*(1+(1/2)*self.incremental_return):
                     if DEBUG:
                         if self.buy_short():
