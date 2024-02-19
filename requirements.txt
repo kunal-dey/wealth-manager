@@ -63,3 +63,6 @@ keras~=2.15.0
 
 psutil~=5.9.7
 tensorflow~=2.15.0
+
+gspread~=6.0.2
+oauth2client~=4.1.3
