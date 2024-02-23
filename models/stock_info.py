@@ -281,9 +281,9 @@ class StockInfo:
                 logger.info("short selection entered")
                 stock_df = self.__result_stock_df.copy()
                 line = stock_df.apply(kaufman_indicator)
-                transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
+                transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
                 logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
-                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1]:
+                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0:
                     logger.info("should return true")
                     return True
         return False
