@@ -182,19 +182,21 @@ class Stage:
                 # if it hits trigger then square off else reset a new trigger
                 if self.cost * (1 + self.current_expected_return + (1/2)*self.incremental_return) < self.current_price < self.trigger/(1+(1/2)*self.incremental_return):
                     if DEBUG:
-                        if self.sell():
-                            if self.stock.number_of_days <= 1:
-                                return "DAY1BREACHED"
-                            else:
-                                return "DAYNBREACHED"
-                    else:
-                        b_orders: list = self.stock.get_quote["buy"]
-                        if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
+                        if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                             if self.sell():
                                 if self.stock.number_of_days <= 1:
                                     return "DAY1BREACHED"
                                 else:
                                     return "DAYNBREACHED"
+                    else:
+                        b_orders: list = self.stock.get_quote["buy"]
+                        if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
+                            if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
+                                if self.sell():
+                                    if self.stock.number_of_days <= 1:
+                                        return "DAY1BREACHED"
+                                    else:
+                                        return "DAYNBREACHED"
             self.set_trigger(self.current_price)
             return "CONTINUE"
 
@@ -209,15 +211,17 @@ class Stage:
             logger.info(f"{self.stock.stock_name} Earlier short trigger:  {self.trigger}, latest price:{self.current_price}")
             if selling_price * 1.005 < self.current_price:
                 if DEBUG:
-                    if self.buy_short():
-                        return "LOSS"
+                    if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                        if self.buy_short():
+                            return "LOSS"
                 else:
                     s_orders: list = self.stock.get_quote["sell"]
                     if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                        if self.buy_short():
-                            return "LOSS"
+                        if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                            if self.buy_short():
+                                return "LOSS"
 
-            if self.stock.latest_price * 1.09 < self.stock.last_buy_price:
+            if self.stock.latest_price * 1.095 < self.stock.last_buy_price:
                 if DEBUG:
                     if self.buy_short():
                         return "BUY_ANOTHER"
@@ -225,16 +229,18 @@ class Stage:
                     s_orders: list = self.stock.get_quote["sell"]
                     if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
                         if self.buy_short():
-                            return "BUY_ANOTHER"
+                                return "BUY_ANOTHER"
             if self.trigger is not None:
                 if self.current_price > self.trigger*(1+(1/2)*self.incremental_return):
                     if DEBUG:
-                        if self.buy_short():
-                            return "SQUARED_OFF"
+                        if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                            if self.buy_short():
+                                return "SQUARED_OFF"
                     else:
                         s_orders: list = self.stock.get_quote["sell"]
                         if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                            if self.buy_short():
-                                return "SQUARED_OFF"
+                            if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                                if self.buy_short():
+                                    return "SQUARED_OFF"
             self.set_trigger(self.current_price)
             return "CONTINUE"

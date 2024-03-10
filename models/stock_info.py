@@ -59,6 +59,8 @@ class StockInfo:
     last_quantity: int = field(default=None)
     remaining_allocation: float = field(default=0.0)
     crossed: bool = field(default=False)
+    chosen_long_stocks: list = field(default=None)
+    chosen_short_stocks: list = field(default=None)
 
     def __post_init__(self):
         self.save_to_db = get_save_to_db(self.COLLECTION, self)
@@ -141,7 +143,7 @@ class StockInfo:
                     quantity=self.quantity
                 ).total_tax_and_charges
 
-    def update_price(self):
+    def update_price(self, chosen_long_stocks, chosen_short_stocks):
         """
         This is required to update the latest price.
 
@@ -152,6 +154,9 @@ class StockInfo:
 
         :return: None
         """
+
+        self.chosen_long_stocks = chosen_long_stocks
+        self.chosen_short_stocks = chosen_short_stocks
         current_price = self.current_price
         if current_price == 'ENDED':
             set_end_process(True)
@@ -248,7 +253,7 @@ class StockInfo:
             return True
         else:
             logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price * 1.2 < self.last_buy_price:
+            if self.latest_price * 1.1 < self.last_buy_price:
                 self.crossed = True
             if self.crossed:
                 if self.__result_stock_df.shape[0] > 60:
@@ -256,7 +261,8 @@ class StockInfo:
                     stock_df = self.__result_stock_df.copy()
                     # stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
                     stock_df.insert(1, "min", stock_df['price'].rolling(window=60).min())
-                    if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.003:
+                    # if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.003:
+                    if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
                         return True
         return False
 
@@ -283,7 +289,9 @@ class StockInfo:
                 line = stock_df.apply(kaufman_indicator)
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
                 logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
-                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
-                    logger.info("should return true")
-                    return True
+                # if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
+                if self.stock_name in self.chosen_short_stocks and self.stock_name not in self.chosen_long_stocks:
+                    if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
+                        return True
         return False
+

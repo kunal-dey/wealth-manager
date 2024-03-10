@@ -8,7 +8,7 @@ from utils.logger import get_logger
 logger: Logger = get_logger(__name__)
 
 
-def predict_running_df(day_based_data, model, params):
+def predict_running_df(day_based_data, model, params, short: bool = False):
 
     def get_slope(col):
         index = list(col.index)
@@ -26,13 +26,13 @@ def predict_running_df(day_based_data, model, params):
     sigma = sigma.iloc[:-1]
 
     def predict_stocks(min_based_data):
-        max_df = min_based_data.rolling(window=30).max().dropna()
-        min_df = min_based_data.rolling(window=30).min().dropna()
-        med_df = (3 / 10) * max_df + (7 / 10) * min_df
-        trend_df = min_based_data.iloc[29:]
-        position_df = trend_df > med_df
-        first_df = position_df.shift(1).iloc[1:]
-        result = trend_df.iloc[30:][~first_df & position_df.iloc[1:]]
+        # max_df = min_based_data.rolling(window=30).max().dropna()
+        # min_df = min_based_data.rolling(window=30).min().dropna()
+        # med_df = (3 / 10) * max_df + (7 / 10) * min_df
+        # trend_df = min_based_data.iloc[29:]
+        # position_df = trend_df > med_df
+        # first_df = position_df.shift(1).iloc[1:]
+        # result = trend_df.iloc[30:][~first_df & position_df.iloc[1:]]
 
         running_df = pd.concat([
             three_month,
@@ -62,15 +62,18 @@ def predict_running_df(day_based_data, model, params):
         running_df['position'] = np.where(running_df['prob'] > 0.8, 1, 0)
 
         selected = []
-        growing = list(running_df[running_df['position'] == 1].index)
+        predictions = list(running_df[running_df['position'] == 1].index)
 
-        filtered_df = min_based_data[growing]
+        filtered_df = min_based_data[predictions]
         line = filtered_df.apply(kaufman_indicator)
         transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
-        filters = (transformed > transformed.shift(1)) & (transformed.shift(1) > transformed.shift(2)) & (transformed > 0)
+        if short:
+            filters = (transformed < transformed.shift(1)) & (transformed.shift(1) < transformed.shift(2)) & (transformed < 0)
+        else:
+            filters = (transformed > transformed.shift(1)) & (transformed.shift(1) > transformed.shift(2)) & (transformed > 0)
 
         for st in list(transformed.iloc[-1][filters.iloc[-1]].index):
-            if st in growing:
+            if st in predictions:
                 selected.append(st)
 
         return selected

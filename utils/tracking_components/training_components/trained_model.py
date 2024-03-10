@@ -33,9 +33,10 @@ class MonitorCallback(Callback):
         monitor_usage()
 
 
-def split_data(split_ratio: float, data_df: pd.DataFrame):
+def split_data(split_ratio: float, data_df: pd.DataFrame, short: bool = False):
     """
     for testing the split ratio can be 0.8 or 0.7 but for regular reading it should be 1
+    :param short:
     :param split_ratio: ratio of train/test data count
     :param data_df: dataframe to split
     :return:
@@ -52,7 +53,10 @@ def split_data(split_ratio: float, data_df: pd.DataFrame):
     logger.info(f"training data count : {train.shape}")
 
     params = (mu, sigma)
-    pickle.dump(params, open(getcwd() + "/temp/params.pkl", "wb"))
+    if short:
+        pickle.dump(params, open(getcwd() + "/temp/params_short.pkl", "wb"))
+    else:
+        pickle.dump(params, open(getcwd() + "/temp/params.pkl", "wb"))
 
     logger.info(f"parameter saved")
     return train, train_s, test, test_s
@@ -80,16 +84,13 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
     return model
 
 
-def train_model(stock_list):
+def train_model(stock_list, short: bool = False):
     logger.info("data extraction")
-    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
-    # condition1 = (data_df['3mo_return'] > 0)
-    # condition2 = (data_df['1mo_return'] > 0)
-    # data_df = data_df[condition1 & condition2]
+    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st], short)
 
     logger.info(f"size: {data_df.shape}")
 
-    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df)
+    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df, short=short)
 
     def set_seeds(seed=100):
         random.seed(seed)
@@ -119,7 +120,11 @@ def train_model(stock_list):
     # log the accuracy
     _, accuracy = model.evaluate(train_s[features], train['dir'])
     logger.info(f"accuracy obtained -> {accuracy}")
-    model.save(getcwd() + "/temp/DNN_model")
+
+    if short:
+        model.save(getcwd() + "/temp/DNN_model_short")
+    else:
+        model.save(getcwd() + "/temp/DNN_model")
 
     logger.info(f"model saved: {model}")
 

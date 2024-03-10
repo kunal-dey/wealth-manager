@@ -39,7 +39,7 @@ async def background_task():
     logger.info(f"test{obtained_stock_list}")
 
     not_loaded = True
-    filtered_stocks, selected_stocks = [], []
+    filtered_stocks, selected_long_stocks, selected_short_stocks = [], [], []
     
     # variable to check if minimum return of 0.005 is obtained in a day then free 2/3 of the portfolio for next day
     today_profit = 0
@@ -101,15 +101,29 @@ async def background_task():
     day_based_data = day_based_data.loc[:TRAINING_DATE]
     day_based_data = day_based_data.ffill().bfill()
 
+    # model to predict long stocks
+
     model = load_model(os.getcwd() + "/temp/DNN_model")
 
-    logger.info(f"model loaded: {model}")
+    logger.info(f"model loaded for long: {model}")
 
     params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
 
-    logger.info(f"mu and sigma loaded: {model}")
+    logger.info(f"mu and sigma loaded for long: {model}")
 
     predict_stocks = predict_running_df(day_based_data, model, params)
+
+    # model to predict short stocks
+
+    short_model = load_model(os.getcwd() + "/temp/DNN_model_short")
+
+    logger.info(f"model loaded for short: {model}")
+
+    short_params = pickle.load(open(os.getcwd() + "/temp/params_short.pkl", "rb"))
+
+    logger.info(f"mu and sigma loaded for short: {model}")
+
+    predict_short_stocks = predict_running_df(day_based_data, model, params, short=True)
 
     # this part will loop till the trading times end
     while current_time < END_TIME:
@@ -151,10 +165,10 @@ async def background_task():
                     prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
-                # selected_stocks = [st[:-3] for st in select_stocks(prediction_df)]
-                # logger.info(f"chosen : {selected_stocks}")
-                selected_stocks = [st[:-3] for st in predict_stocks(prediction_df)]
-                logger.info(f"chosen : {selected_stocks}")
+                selected_long_stocks = [st[:-3] for st in predict_stocks(prediction_df)]
+                selected_short_stocks = [st[:-3] for st in predict_short_stocks(prediction_df)]
+                logger.info(f"chosen long: {selected_long_stocks}")
+                logger.info(f"chosen short: {selected_short_stocks}")
 
                 logger.info(f"starting cash : {account.starting_cash}")
                 logger.info(f"available cash : {account.available_cash}")
@@ -163,14 +177,38 @@ async def background_task():
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
                     # selecting stock which meets the criteria
-                    for stock_col in selected_stocks:
-                        # available cash keeps on changing so max_stocks keeps on changing
-                        set_max_stocks(int(account.available_cash/get_allocation()))
-                        if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
-                            # if wealth has crossed 0.005 then keep 1/3rd of stocks
-                            if today_profit > account.starting_cash*0.005:
-                                if ((2/3)*account.starting_cash + get_allocation()) <= account.available_cash:
+                    for stock_col in selected_long_stocks:
+                        if stock_col not in selected_short_stocks:
+                            # available cash keeps on changing so max_stocks keeps on changing
+                            set_max_stocks(int(account.available_cash/get_allocation()))
+                            if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
+                                # if wealth has crossed 0.005 then keep 1/3rd of stocks
+                                if today_profit > account.starting_cash*0.005:
+                                    if ((2/3)*account.starting_cash + get_allocation()) <= account.available_cash:
 
+                                        raw_stock = StockInfo(stock_col, 'NSE')
+                                        if not DEBUG:
+
+                                            sell_orders: list = raw_stock.get_quote["sell"]
+                                            zero_quantity = True
+                                            for item in sell_orders:
+                                                if item['quantity'] > 0:
+                                                    zero_quantity = False
+                                                break
+                                            if zero_quantity:
+                                                continue
+                                        account.stocks_to_track[stock_col] = raw_stock
+                                        account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
+                                        # even if it may seem that allocation is reduced when bought, actual change is while adding the
+                                        # stock in stocks to track
+                                        account.available_cash -= get_allocation()
+                                        # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
+                                        stock_df = prediction_df[[f"{stock_col}.NS"]]
+                                        stock_df.reset_index(inplace=True, drop=True)
+                                        stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                                        stock_df.columns = ['price']
+                                        stock_df.to_csv(f"temp/{stock_col}.csv")
+                                else:
                                     raw_stock = StockInfo(stock_col, 'NSE')
                                     if not DEBUG:
 
@@ -193,36 +231,13 @@ async def background_task():
                                     stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
                                     stock_df.columns = ['price']
                                     stock_df.to_csv(f"temp/{stock_col}.csv")
-                            else:
-                                raw_stock = StockInfo(stock_col, 'NSE')
-                                if not DEBUG:
-
-                                    sell_orders: list = raw_stock.get_quote["sell"]
-                                    zero_quantity = True
-                                    for item in sell_orders:
-                                        if item['quantity'] > 0:
-                                            zero_quantity = False
-                                        break
-                                    if zero_quantity:
-                                        continue
-                                account.stocks_to_track[stock_col] = raw_stock
-                                account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
-                                # even if it may seem that allocation is reduced when bought, actual change is while adding the
-                                # stock in stocks to track
-                                account.available_cash -= get_allocation()
-                                # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
-                                stock_df = prediction_df[[f"{stock_col}.NS"]]
-                                stock_df.reset_index(inplace=True, drop=True)
-                                stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
-                                stock_df.columns = ['price']
-                                stock_df.to_csv(f"temp/{stock_col}.csv")
 
                 """
                     update price for all the stocks which are being tracked
                 """
 
                 for stock in account.stocks_to_track.keys():
-                    account.stocks_to_track[stock].update_price()
+                    account.stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
                     try:
@@ -269,7 +284,7 @@ async def background_task():
                         os.remove(f"temp/{position_name}.csv")
 
                 for stock in account.short_stocks_to_track.keys():
-                    account.short_stocks_to_track[stock].update_price()
+                    account.short_stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
 
                 """
                     if the trigger for buying short positions are breached in short position then buy
@@ -314,7 +329,7 @@ async def background_task():
 
                 for short_position_name in short_positions_to_delete:
                     del account.short_positions[short_position_name]
-                    os.remove(f"temp/{position_name}.csv")
+                    os.remove(f"temp/{short_position_name}.csv")
 
                 if current_time > BUY_SHORTS:
                     short_positions_to_delete_at_end = []

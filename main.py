@@ -4,6 +4,7 @@ from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
 from datetime import datetime
+from time import sleep
 
 from constants.global_contexts import set_access_token
 
@@ -88,6 +89,8 @@ async def train():
 
     def training():
         train_model(obtained_stock_list)
+        sleep(10)
+        train_model(obtained_stock_list, short=True)
 
     # starting the training process
     app.add_background_task(training)
