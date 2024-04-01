@@ -41,12 +41,21 @@ class Account:
         holding_list: list[Holding] = await retrieve_all_services(Holding.COLLECTION, Holding)
         logger.info(f"{[jsonify(holding) for holding in holding_list]}")
 
+        # after the stock is put in holding the price may be lower or higher than the one bought earlier
+        # this is to update the position price so that correct price is used for trading session
+
+        holdings_from_api = {}
+
+        for holding in kite_context.holdings():
+            holdings_from_api[holding['tradingsymbol']] = holding['average_price']
+
         for holding_obj in holding_list:
             self.holdings[holding_obj.stock.stock_name] = holding_obj
             self.starting_cash += get_allocation()/3
             if holding_obj.stock.stock_name in list(self.stocks_to_track.keys()):
                 self.holdings[holding_obj.stock.stock_name].stock = self.stocks_to_track[holding_obj.stock.stock_name]
                 self.holdings[holding_obj.stock.stock_name].stock.quantity = self.holdings[holding_obj.stock.stock_name].quantity
+                self.holdings[holding_obj.stock.stock_name].position_price = holdings_from_api[holding_obj.stock.stock_name]
 
     def buy_stocks(self):
         """

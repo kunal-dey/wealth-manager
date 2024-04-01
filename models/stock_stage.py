@@ -182,21 +182,21 @@ class Stage:
                 # if it hits trigger then square off else reset a new trigger
                 if self.cost * (1 + self.current_expected_return + (1/2)*self.incremental_return) < self.current_price < self.trigger/(1+(1/2)*self.incremental_return):
                     if DEBUG:
-                        if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
+                        # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
+                        if self.sell():
+                            if self.stock.number_of_days <= 1:
+                                return "DAY1BREACHED"
+                            else:
+                                return "DAYNBREACHED"
+                    else:
+                        b_orders: list = self.stock.get_quote["buy"]
+                        if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
+                            # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                             if self.sell():
                                 if self.stock.number_of_days <= 1:
                                     return "DAY1BREACHED"
                                 else:
                                     return "DAYNBREACHED"
-                    else:
-                        b_orders: list = self.stock.get_quote["buy"]
-                        if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
-                            if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
-                                if self.sell():
-                                    if self.stock.number_of_days <= 1:
-                                        return "DAY1BREACHED"
-                                    else:
-                                        return "DAYNBREACHED"
             self.set_trigger(self.current_price)
             return "CONTINUE"
 

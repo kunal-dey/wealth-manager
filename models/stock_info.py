@@ -289,9 +289,8 @@ class StockInfo:
                 line = stock_df.apply(kaufman_indicator)
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
                 logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
-                # if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
-                if self.stock_name in self.chosen_short_stocks and self.stock_name not in self.chosen_long_stocks:
-                    if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
-                        return True
+                # if self.stock_name in self.chosen_short_stocks and self.stock_name not in self.chosen_long_stocks:
+                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
+                    return True
         return False
 

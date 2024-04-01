@@ -123,7 +123,7 @@ async def background_task():
 
     logger.info(f"mu and sigma loaded for short: {model}")
 
-    predict_short_stocks = predict_running_df(day_based_data, model, params, short=True)
+    predict_short_stocks = predict_running_df(day_based_data, short_model, short_params, short=True)
 
     # this part will loop till the trading times end
     while current_time < END_TIME:

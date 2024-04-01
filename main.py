@@ -96,6 +96,15 @@ async def train():
     app.add_background_task(training)
     return {"message": "Training started"}
 
+
+@app.get("/holdings")
+async def holdings_test():
+    holdings_from_api = {}
+
+    for holding in kite_context.holdings():
+        holdings_from_api[holding['tradingsymbol']] = holding['average_price']
+    return {"msg": holdings_from_api}
+
 resource_list: list[Blueprint] = [stocks_input]
 
 for resource in resource_list:
