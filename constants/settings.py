@@ -1,12 +1,12 @@
 from datetime import datetime
 
-DEBUG = False
+DEBUG = True
 
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2024, 3, 7) if DEBUG else datetime.now()
-TRAINING_DATE = datetime(2024, 3, 6) if DEBUG else datetime.now()
+TODAY = datetime(2024, 3, 28) if DEBUG else datetime.now()
+TRAINING_DATE = datetime(2024, 3, 28) if DEBUG else datetime.now()
 
 GENERATOR_URL = '127.0.0.1:8082'
 MIS_STOCK_LIST = "https://docs.google.com/spreadsheets/d/1fLTsNpFJPK349RTjs0GRSXJZD-5soCUkZt9eSMTJ2m4/export?format=csv"

@@ -1,5 +1,7 @@
+import os
 from dataclasses import dataclass, field
 from logging import Logger
+from datetime import datetime
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
@@ -51,20 +53,22 @@ class Account:
 
         for holding_obj in holding_list:
             self.holdings[holding_obj.stock.stock_name] = holding_obj
-            self.starting_cash += get_allocation()/3
+            # self.starting_cash += get_allocation()/3
             if holding_obj.stock.stock_name in list(self.stocks_to_track.keys()):
                 self.holdings[holding_obj.stock.stock_name].stock = self.stocks_to_track[holding_obj.stock.stock_name]
                 self.holdings[holding_obj.stock.stock_name].stock.quantity = self.holdings[holding_obj.stock.stock_name].quantity
-                self.holdings[holding_obj.stock.stock_name].position_price = holdings_from_api[holding_obj.stock.stock_name]
+                if not DEBUG:
+                    self.holdings[holding_obj.stock.stock_name].position_price = holdings_from_api[holding_obj.stock.stock_name]
 
     def buy_stocks(self):
         """
         if it satisfies all the buying criteria then it buys the stock
         :return: None
         """
+        stocks_to_delete = []
         for stock_key in list(self.stocks_to_track.keys()):
-            logger.info(f"{stock_key}: allocation {self.stocks_to_track[stock_key].remaining_allocation}")
-            if self.stocks_to_track[stock_key].remaining_allocation > 0:
+            if stock_key not in list(self.positions.keys()):
+
                 if not DEBUG:
                     sell_orders: list = self.stocks_to_track[stock_key].get_quote["sell"]
                     logger.info(f"{stock_key}: sell_orders {sell_orders}")
@@ -75,11 +79,10 @@ class Account:
                             break
                     if zero_quantity:
                         continue
-                logger.info(f"{stock_key}: get parameters")
-
                 quantity, buy_price = self.stocks_to_track[stock_key].buy_parameters()
-                logger.info(f"{stock_key}: {quantity} {buy_price}")
-                if self.stocks_to_track[stock_key].whether_buy():
+                logger.info(f"parameters for {stock_key}: {quantity} {buy_price}")
+                buy_status = self.stocks_to_track[stock_key].whether_buy()
+                if buy_status:
                     if long(
                         symbol=self.stocks_to_track[stock_key].stock_name,
                         quantity=int(quantity),
@@ -87,31 +90,14 @@ class Account:
                         exchange=self.stocks_to_track[stock_key].exchange
                     ):
                         logger.info(f"{self.stocks_to_track[stock_key].stock_name} has been bought @ {buy_price}.")
-
                         self.stocks_to_track[stock_key].in_position = True  # now it will look for buy orders
-
-                        if self.stocks_to_track[stock_key].first_load:
-                            self.positions[stock_key] = Position(
-                                position_price=buy_price,
-                                stock=self.stocks_to_track[stock_key],
-                                position_type=PositionType.LONG,
-                                quantity=int(quantity),
-                                product_type=ProductType.DELIVERY
-                            )
-                            self.stocks_to_track[stock_key].remaining_allocation -= self.stocks_to_track[stock_key].remaining_allocation*(2/3)
-                        else:
-                            num = self.stocks_to_track[stock_key].last_buy_price*self.stocks_to_track[stock_key].last_quantity + buy_price * quantity
-                            total_quantity = self.stocks_to_track[stock_key].last_quantity + quantity
-                            avg_price = num/total_quantity
-                            self.positions[stock_key] = Position(
-                                position_price=avg_price,
-                                stock=self.stocks_to_track[stock_key],
-                                position_type=PositionType.LONG,
-                                quantity=int(total_quantity),
-                                product_type=ProductType.DELIVERY
-                            )
-                            self.stocks_to_track[stock_key].remaining_allocation = 0
-
+                        self.positions[stock_key] = Position(
+                            position_price=buy_price,
+                            stock=self.stocks_to_track[stock_key],
+                            position_type=PositionType.LONG,
+                            quantity=int(quantity),
+                            product_type=ProductType.DELIVERY
+                        )
                         # if this is encountered first time then it will make it false else always make it false
                         # earlier this was in stock info, but it has been moved since if there is an error in buying,
                         # then it does not buy the stock and make it false. so if the stock is increasing then false will
@@ -119,31 +105,55 @@ class Account:
                         self.stocks_to_track[stock_key].first_load = False
                         self.stocks_to_track[stock_key].last_buy_price = buy_price
                         self.stocks_to_track[stock_key].last_quantity = quantity
+                else:
+                    if self.stocks_to_track[stock_key].first_load:
+                        self.available_cash += get_allocation()
+                        stocks_to_delete.append(stock_key)
+                        os.remove(f"temp/{stock_key}.csv")
+
+        for stock_key in stocks_to_delete:
+            del self.stocks_to_track[stock_key]
 
     def short_stocks(self):
-        for stock_key in list(self.stocks_to_track.keys()):
-            logger.info(f"{stock_key}: {self.stocks_to_track[stock_key].first_load} {self.stocks_to_track[stock_key].remaining_allocation}")
-            if not self.stocks_to_track[stock_key].first_load and self.stocks_to_track[stock_key].remaining_allocation > 0:
-                logger.info(f"{stock_key}: get short parameters")
-                quantity, sell_price = self.stocks_to_track[stock_key].short_parameters()
-                logger.info(f"{stock_key}: {quantity} {sell_price}")
-                logger.info(f"{stock_key}: condition {self.positions.keys()} {self.short_positions.keys()}")
-                if stock_key in self.positions.keys() and stock_key not in self.short_positions.keys():
-                    if self.stocks_to_track[stock_key].whether_short():
-                        if short(
-                            symbol=self.stocks_to_track[stock_key].stock_name,
-                            quantity=int(quantity),
-                            product_type=ProductType.INTRADAY,
-                            exchange=self.stocks_to_track[stock_key].exchange
-                        ):
-                            logger.info(f"{self.stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
-                            self.short_positions[stock_key] = Position(
+        for stock_key in list(self.short_stocks_to_track.keys()):
+            if stock_key not in self.short_positions.keys():
+                quantity, sell_price = self.short_stocks_to_track[stock_key].short_parameters()
+                logger.info(f"parameters for {stock_key}: {quantity} , sell price :{sell_price}")
+                if self.short_stocks_to_track[stock_key].whether_short():
+                    if short(
+                        symbol=self.short_stocks_to_track[stock_key].stock_name,
+                        quantity=int(quantity),
+                        product_type=ProductType.INTRADAY,
+                        exchange=self.short_stocks_to_track[stock_key].exchange
+                    ):
+                        logger.info(f"{self.short_stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
+                        self.short_positions[stock_key] = Position(
                                     position_price=sell_price,
                                     stock=self.stocks_to_track[stock_key],
                                     position_type=PositionType.SHORT,
                                     quantity=int(quantity),
                                     product_type=ProductType.INTRADAY
                                 )
+        # for stock_key in list(self.stocks_to_track.keys()):
+        #     if not self.stocks_to_track[stock_key].first_load and self.stocks_to_track[stock_key].remaining_allocation > 0:
+        #         quantity, sell_price = self.stocks_to_track[stock_key].short_parameters()
+        #         logger.info(f"parameters for {stock_key}: {quantity} , sell price :{sell_price}")
+        #         if stock_key in self.positions.keys() and stock_key not in self.short_positions.keys():
+        #             if self.stocks_to_track[stock_key].whether_short():
+        #                 if short(
+        #                     symbol=self.stocks_to_track[stock_key].stock_name,
+        #                     quantity=int(quantity),
+        #                     product_type=ProductType.INTRADAY,
+        #                     exchange=self.stocks_to_track[stock_key].exchange
+        #                 ):
+        #                     logger.info(f"{self.stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
+        #                     self.short_positions[stock_key] = Position(
+        #                             position_price=sell_price,
+        #                             stock=self.stocks_to_track[stock_key],
+        #                             position_type=PositionType.SHORT,
+        #                             quantity=int(quantity),
+        #                             product_type=ProductType.INTRADAY
+        #                         )
 
     def convert_positions_to_holdings(self):
         """

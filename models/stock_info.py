@@ -18,7 +18,7 @@ from models.costs.delivery_trading_cost import DeliveryTransactionCost
 from models.costs.intraday_trading_cost import IntradayTransactionCost
 from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
-from constants.settings import GENERATOR_URL
+from constants.settings import GENERATOR_URL, MAXIMUM_ALLOCATION
 
 logger: Logger = get_logger(__name__)
 
@@ -31,9 +31,8 @@ def get_schema():
         "wallet": "float",
         "created_at": "datetime",
         "last_buy_price": "float",
-        "remaining_allocation": "float",
         "last_quantity": "float",
-        "crossed": "bool"
+        "first_load": "bool"
     }
 
 
@@ -57,8 +56,6 @@ class StockInfo:
     in_position: bool = field(default=False)
     last_buy_price: float = field(default=None)
     last_quantity: int = field(default=None)
-    remaining_allocation: float = field(default=0.0)
-    crossed: bool = field(default=False)
     chosen_long_stocks: list = field(default=None)
     chosen_short_stocks: list = field(default=None)
 
@@ -115,6 +112,12 @@ class StockInfo:
 
     @property
     def number_of_days(self):
+        """
+            If today is a weekday and not a holiday, the number of days would be 1.
+            If today is a weekday and a holiday, or if it's a weekend, the number of days would be 0.
+        Returns:
+
+        """
         dtstart, until = self.created_at.date(), TODAY.date()
         days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dtstart, until=until).count()
         for day in load_holidays()['dates']:
@@ -168,10 +171,7 @@ class StockInfo:
             self.update_stock_df(self.latest_price)
 
     def buy_parameters(self):
-        if self.first_load:
-            amount: float = self.remaining_allocation * (2 / 3)
-        else:
-            amount: float = self.remaining_allocation
+        amount: float = MAXIMUM_ALLOCATION
 
         def get_quantity_and_price(s_orders):
             accumulated, quantity = 0, 0
@@ -196,7 +196,7 @@ class StockInfo:
         return self.quantity, price
 
     def short_parameters(self):
-        amount: float = self.remaining_allocation
+        amount: float = MAXIMUM_ALLOCATION
 
         def get_quantity_and_price(b_orders):
             accumulated, quantity = 0, 0
@@ -248,22 +248,20 @@ class StockInfo:
         3. The current price is not more than 1% of the trigger price
         :return: True, if buy else false
         """
-        logger.info(f"whether buy: {self.stock_name}")
-        if self.first_load:  # this is changed in account file
-            return True
-        else:
-            logger.info(f"{self.latest_price},{self.last_buy_price}")
-            if self.latest_price * 1.1 < self.last_buy_price:
-                self.crossed = True
-            if self.crossed:
-                if self.__result_stock_df.shape[0] > 60:
-                    logger.info("entered")
-                    stock_df = self.__result_stock_df.copy()
-                    # stock_df.insert(1, "signal", stock_df['price'].ewm(span=60).mean())
-                    stock_df.insert(1, "min", stock_df['price'].rolling(window=60).min())
-                    # if stock_df["price"].iloc[-1] > stock_df["min"].iloc[-1] * 1.003:
-                    if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
-                        return True
+        def get_slope(col):
+            index = list(col.index)
+            coefficient = np.polyfit(index, col.values, 1)
+            ini = coefficient[0] * index[0] + coefficient[1]
+            return coefficient[0] / ini
+
+        if self.__result_stock_df.shape[0] > 60:
+            if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
+                logger.info("entered on whether to buy the stock")
+                stock_df = self.__result_stock_df.copy()
+                line = stock_df.apply(kaufman_indicator)
+                transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
+                if transformed.price.iloc[-1] > transformed.shift(1).price.iloc[-1] > 0:
+                    return True
         return False
 
     def whether_short(self) -> bool:
@@ -282,15 +280,13 @@ class StockInfo:
 
         logger.info(f"latest price {self.latest_price}, buy_cost {buy_cost}")
 
-        if self.latest_price * 1.002 < self.last_buy_price < self.latest_price * 1.18:
-            if self.__result_stock_df.shape[0] > 60:
+        if self.__result_stock_df.shape[0] > 60:
+            if (self.stock_name in self.chosen_short_stocks) and (self.stock_name not in self.chosen_long_stocks):
                 logger.info("short selection entered")
                 stock_df = self.__result_stock_df.copy()
                 line = stock_df.apply(kaufman_indicator)
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-                logger.info(f"transform: {transformed.price.iloc[-1]} {transformed.shift(1).price.iloc[-1]}")
-                # if self.stock_name in self.chosen_short_stocks and self.stock_name not in self.chosen_long_stocks:
-                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0 < transformed.shift(2).price.iloc[-1]:
+                if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0:
                     return True
         return False
 

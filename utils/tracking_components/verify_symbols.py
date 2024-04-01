@@ -51,9 +51,7 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
     temp_df.columns = ['Close']
     temp_df = temp_df[(temp_df['Close'] > lower_price) & (temp_df['Close'] < higher_price)]
 
-    # mis_stocks = pd.read_csv(getcwd() + "/temp/mis_stocks.csv")['Symbol']
     mis_stocks = pd.read_csv(MIS_STOCK_LIST, skiprows=1, header=1)['Symbol']
-    # mis_stocks = list(mis_stocks['Symbol'])
     stocks_present = []
     print(list(mis_stocks))
     for a in list(temp_df.index):

@@ -26,13 +26,6 @@ def predict_running_df(day_based_data, model, params, short: bool = False):
     sigma = sigma.iloc[:-1]
 
     def predict_stocks(min_based_data):
-        # max_df = min_based_data.rolling(window=30).max().dropna()
-        # min_df = min_based_data.rolling(window=30).min().dropna()
-        # med_df = (3 / 10) * max_df + (7 / 10) * min_df
-        # trend_df = min_based_data.iloc[29:]
-        # position_df = trend_df > med_df
-        # first_df = position_df.shift(1).iloc[1:]
-        # result = trend_df.iloc[30:][~first_df & position_df.iloc[1:]]
 
         running_df = pd.concat([
             three_month,

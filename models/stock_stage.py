@@ -7,7 +7,8 @@ from utils.logger import get_logger
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
-from constants.settings import DELIVERY_INITIAL_RETURN, DELIVERY_INCREMENTAL_RETURN, EXPECTED_MINIMUM_MONTHLY_RETURN, DEBUG
+from constants.settings import DELIVERY_INITIAL_RETURN, DELIVERY_INCREMENTAL_RETURN, EXPECTED_MINIMUM_MONTHLY_RETURN, \
+    DEBUG
 
 from utils.take_position import short, long
 
@@ -34,12 +35,12 @@ class Stage:
             if self.stock.number_of_days >= 2:
                 # if accumulated return > 0.03 then return 0.03 else accumulated return
                 returns = min(
-                    ((1 + DELIVERY_INITIAL_RETURN) ** (self.stock.number_of_days+1)) - 1,
+                    ((1 + DELIVERY_INITIAL_RETURN) ** (self.stock.number_of_days + 1)) - 1,
                     EXPECTED_MINIMUM_MONTHLY_RETURN
                 )
-                return 3/2 * returns if self.stock.remaining_allocation > 0 else returns
+                return returns
             else:
-                return DELIVERY_INITIAL_RETURN * (3/2 if self.stock.remaining_allocation > 0 else 1)
+                return DELIVERY_INITIAL_RETURN
         else:
             return 0.002
 
@@ -130,7 +131,7 @@ class Stage:
             selling_price = self.current_price
             tx_cost = self.stock.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
             wallet_value = selling_price - (buy_price + tx_cost)
-            self.stock.wallet = wallet_value * self.quantity
+            self.stock.wallet += wallet_value * self.quantity
             logger.info(f"Wallet: {self.stock.wallet}")
             return True
         return False
@@ -146,7 +147,7 @@ class Stage:
             selling_price = self.position_price
             tx_cost = self.stock.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
             wallet_value = selling_price - (buy_price + tx_cost)
-            self.stock.wallet = wallet_value * self.quantity
+            self.stock.wallet += wallet_value * self.quantity
             logger.info(f"Wallet: {self.stock.wallet}")
             return True
         return False
@@ -180,28 +181,34 @@ class Stage:
             logger.info(f"{self.stock.stock_name} Earlier trigger:  {self.trigger}, latest price:{self.current_price}")
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
-                if self.cost * (1 + self.current_expected_return + (1/2)*self.incremental_return) < self.current_price < self.trigger/(1+(1/2)*self.incremental_return):
+                if self.cost * (1 + self.current_expected_return + (
+                        1 / 2) * self.incremental_return) < self.current_price < self.trigger / (
+                        1 + (1 / 2) * self.incremental_return):
                     if DEBUG:
                         # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                         if self.sell():
-                            if self.stock.number_of_days <= 1:
-                                return "DAY1BREACHED"
-                            else:
-                                return "DAYNBREACHED"
+                            return "SELL_PROFIT"
                     else:
                         b_orders: list = self.stock.get_quote["buy"]
                         if sum([order['orders'] * order['quantity'] for order in b_orders]) > self.quantity:
                             # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                             if self.sell():
-                                if self.stock.number_of_days <= 1:
-                                    return "DAY1BREACHED"
-                                else:
-                                    return "DAYNBREACHED"
+                                return "SELL_PROFIT"
+            else:
+                if self.current_price < self.stock.last_buy_price * 0.995:
+                    if self.stock.whether_short():
+                        if DEBUG:
+                            if self.sell():
+                                return "SELL_LOSS"
+                        else:
+                            s_orders: list = self.stock.get_quote["sell"]
+                            if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
+                                if self.sell():
+                                    return "SELL_LOSS"
+
             self.set_trigger(self.current_price)
             return "CONTINUE"
 
-        # if the position was short then on achieving the trigger, it should buy
-        # to clear the position
         if (self.position_type == PositionType.SHORT) and (self.current_price is not None):
             buy_price = self.current_price
             selling_price = self.position_price
@@ -211,36 +218,27 @@ class Stage:
             logger.info(f"{self.stock.stock_name} Earlier short trigger:  {self.trigger}, latest price:{self.current_price}")
             if selling_price * 1.005 < self.current_price:
                 if DEBUG:
-                    if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                    if self.stock.whether_buy():
                         if self.buy_short():
-                            return "LOSS"
+                            return "BUY_LOSS"
                 else:
                     s_orders: list = self.stock.get_quote["sell"]
                     if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                        if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                        if self.stock.whether_buy():
                             if self.buy_short():
-                                return "LOSS"
-
-            if self.stock.latest_price * 1.095 < self.stock.last_buy_price:
-                if DEBUG:
-                    if self.buy_short():
-                        return "BUY_ANOTHER"
-                else:
-                    s_orders: list = self.stock.get_quote["sell"]
-                    if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                        if self.buy_short():
-                                return "BUY_ANOTHER"
+                                return "BUY_LOSS"
             if self.trigger is not None:
                 if self.current_price > self.trigger*(1+(1/2)*self.incremental_return):
                     if DEBUG:
-                        if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                        if self.stock.whether_buy():
                             if self.buy_short():
-                                return "SQUARED_OFF"
+                                return "BUY_PROFIT"
                     else:
                         s_orders: list = self.stock.get_quote["sell"]
                         if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
-                            if self.stock.stock_name in self.stock.chosen_long_stocks and self.stock.stock_name not in self.stock.chosen_short_stocks:
+                            if self.stock.whether_buy():
                                 if self.buy_short():
-                                    return "SQUARED_OFF"
+                                    return "BUY_PROFIT"
             self.set_trigger(self.current_price)
             return "CONTINUE"
+

@@ -15,7 +15,8 @@ from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
-    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE, BUY_SHORTS
+    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE, \
+    BUY_SHORTS, EXPECTED_MINIMUM_MONTHLY_RETURN
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 
@@ -30,15 +31,15 @@ async def background_task():
 
     logger.info("BACKGROUND TASK STARTED")
 
-    current_time = datetime.now()
-
     account: Account = Account()
 
+    # prediction_df columns contains .NS whereas obtained_stock_list has all stocks which can be traded and are in mis
     prediction_df, obtained_stock_list = None, await get_correct_symbol()
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
-    logger.info(f"test{obtained_stock_list}")
+    logger.info(f"non BE stock list : {obtained_stock_list}")
 
     not_loaded = True
+    # filtered stocks contains all stocks in prediction_df with .NS removed
     filtered_stocks, selected_long_stocks, selected_short_stocks = [], [], []
     
     # variable to check if minimum return of 0.005 is obtained in a day then free 2/3 of the portfolio for next day
@@ -47,32 +48,34 @@ async def background_task():
     """
     START OF DAY ACTIVITIES
     """
-    stock_list: list[StockInfo] = await retrieve_all_services(StockInfo.COLLECTION, StockInfo)
-    logger.info(f"{stock_list}")
 
     # fetch all the stocks already added in stock list
+    stock_list: list[StockInfo] = await retrieve_all_services(StockInfo.COLLECTION, StockInfo)
+    logger.info(f" list of all stocks to add: {stock_list}")
+    logger.info(f" per stock allocation: {get_allocation()}")
+
+    # load all the stock objects to stock to track
     for stock_obj in stock_list:
-        stock_obj.first_load = False
         account.stocks_to_track[stock_obj.stock_name] = stock_obj
 
-    logger.info(f"remaining { [(st.stock_name,st.remaining_allocation) for st in stock_list]}")
-
     # ignoring all two third stores
-    if DEBUG:
-        account.available_cash = account.available_cash - len(stock_list)*get_allocation()
-    else:
-        account.available_cash = account.available_cash - sum([st.remaining_allocation for st in stock_list])
+    account.available_cash = account.available_cash - len(stock_list)*get_allocation()
+
     # load all holdings from the database
     await account.load_holdings()
 
+    # loading the prediction df from the file or from yahoo finance
     try:
         prediction_df = pd.read_csv(f"temp/prediction_df.csv", index_col=0)
         stocks_present = []
+
+        # remove .NS from the symbol which is downloaded from yahoo finance
         for a in [i[:-3] for i in list(prediction_df.columns)]:
             for b in obtained_stock_list:
                 if a == b:
                     stocks_present.append(f"{a}.NS")
         prediction_df = prediction_df[stocks_present]
+        prediction_df.to_csv(f"temp/prediction_df.csv")
     except FileNotFoundError:
         prediction_df = None
     if prediction_df is None:
@@ -84,62 +87,68 @@ async def background_task():
         prediction_df.reset_index(drop=True, inplace=True)
         prediction_df.to_csv(f"temp/prediction_df.csv")
 
+    # loading all holdings and stocks into a list to compare what has been sold at the end
+    # these are just used for verification at the end
+
     initial_list_of_holdings = list(account.holdings.keys())
     initial_list_of_stocks = list(account.stocks_to_track.keys())
 
+    # this is done as mostly we are storing holding and trade occurs as positions
     account.convert_holdings_to_positions()
 
-    logger.info(f"starting cash : {account.available_cash}")
+    logger.info(f"starting cash: {account.available_cash}")
 
     """
         model and parameter setup
     """
 
     # these are used as cache and will reduce the execution time
-    day_based_data = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='6mo', interval='1d', progress=False)['Close']
+    day_based_data = yf.download(tickers=list(prediction_df.columns), period='6mo', interval='1d', progress=False)['Close']
     day_based_data.index = pd.to_datetime(day_based_data.index)
     day_based_data = day_based_data.loc[:TRAINING_DATE]
     day_based_data = day_based_data.ffill().bfill()
 
     # model to predict long stocks
 
-    model = load_model(os.getcwd() + "/temp/DNN_model")
+    long_model = load_model(os.getcwd() + "/temp/DNN_model")
 
-    logger.info(f"model loaded for long: {model}")
+    logger.info(f"model loaded for long: {long_model}")
 
-    params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
+    long_params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
 
-    logger.info(f"mu and sigma loaded for long: {model}")
+    logger.info(f"mu and sigma loaded for long: {long_params}")
 
-    predict_stocks = predict_running_df(day_based_data, model, params)
+    predict_long_stocks = predict_running_df(day_based_data, long_model, long_params)
 
     # model to predict short stocks
 
     short_model = load_model(os.getcwd() + "/temp/DNN_model_short")
 
-    logger.info(f"model loaded for short: {model}")
+    logger.info(f"model loaded for short: {short_model}")
 
     short_params = pickle.load(open(os.getcwd() + "/temp/params_short.pkl", "rb"))
 
-    logger.info(f"mu and sigma loaded for short: {model}")
+    logger.info(f"mu and sigma loaded for short: {short_params}")
 
     predict_short_stocks = predict_running_df(day_based_data, short_model, short_params, short=True)
 
     # this part will loop till the trading times end
+    current_time = datetime.now()
     while current_time < END_TIME:
         current_time = datetime.now()
+
+        # if the trading has not started then iterate every 1 sec else iterate every 30 sec
         if START_TIME < current_time:
             await sleep(SLEEP_INTERVAL)
         else:
             await sleep(1)
 
+        # even if any error occurs it will not break it
         try:
             if not_loaded and current_time >= START_TIME:
-                # obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
                 filtered_stocks = [i[:-3] for i in list(prediction_df.columns)]
 
-                logger.info(f"list of stocks: {obtained_stock_list}")
-                logger.info(f"allocation: {get_allocation()}")
+                logger.info(f"list of filtered stocks: {filtered_stocks}")
                 not_loaded = False
 
             if end_process():
@@ -152,6 +161,7 @@ async def background_task():
             if START_TIME < current_time:
                 # update the prediction_df after every interval
                 new_cost_df = await fetch_current_prices(filtered_stocks)
+                # the if condition is for the debug process
                 if new_cost_df is None:
                     set_end_process(True)
                 else:
@@ -165,72 +175,46 @@ async def background_task():
                     prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
-                selected_long_stocks = [st[:-3] for st in predict_stocks(prediction_df)]
+                selected_long_stocks = [st[:-3] for st in predict_long_stocks(prediction_df)]
                 selected_short_stocks = [st[:-3] for st in predict_short_stocks(prediction_df)]
+
                 logger.info(f"chosen long: {selected_long_stocks}")
                 logger.info(f"chosen short: {selected_short_stocks}")
 
-                logger.info(f"starting cash : {account.starting_cash}")
                 logger.info(f"available cash : {account.available_cash}")
 
-                logger.info(f"track: {account.stocks_to_track.keys()}")
+                logger.info(f"list of the stocks to track: {account.stocks_to_track.keys()}")
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
                     # selecting stock which meets the criteria
                     for stock_col in selected_long_stocks:
                         if stock_col not in selected_short_stocks:
                             # available cash keeps on changing so max_stocks keeps on changing
+                            # the stock will be added if it is added for the first time
                             set_max_stocks(int(account.available_cash/get_allocation()))
-                            if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
-                                # if wealth has crossed 0.005 then keep 1/3rd of stocks
-                                if today_profit > account.starting_cash*0.005:
-                                    if ((2/3)*account.starting_cash + get_allocation()) <= account.available_cash:
+                            if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys() and stock_col not in account.short_stocks_to_track.keys():
 
-                                        raw_stock = StockInfo(stock_col, 'NSE')
-                                        if not DEBUG:
+                                raw_stock = StockInfo(stock_col, 'NSE')
+                                if not DEBUG:
+                                    sell_orders: list = raw_stock.get_quote["sell"]
+                                    zero_quantity = True
+                                    for item in sell_orders:
+                                        if item['quantity'] > 0:
+                                            zero_quantity = False
+                                        break
+                                    if zero_quantity:
+                                        continue
+                                account.stocks_to_track[stock_col] = raw_stock
+                                # even if it may seem that allocation is reduced when bought, actual change is while adding the
+                                # stock in stocks to track
+                                account.available_cash -= get_allocation()
+                                stock_df = prediction_df[[f"{stock_col}.NS"]]
+                                stock_df.reset_index(inplace=True, drop=True)
+                                stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                                stock_df.columns = ['price']
+                                stock_df.to_csv(f"temp/{stock_col}.csv")
 
-                                            sell_orders: list = raw_stock.get_quote["sell"]
-                                            zero_quantity = True
-                                            for item in sell_orders:
-                                                if item['quantity'] > 0:
-                                                    zero_quantity = False
-                                                break
-                                            if zero_quantity:
-                                                continue
-                                        account.stocks_to_track[stock_col] = raw_stock
-                                        account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
-                                        # even if it may seem that allocation is reduced when bought, actual change is while adding the
-                                        # stock in stocks to track
-                                        account.available_cash -= get_allocation()
-                                        # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
-                                        stock_df = prediction_df[[f"{stock_col}.NS"]]
-                                        stock_df.reset_index(inplace=True, drop=True)
-                                        stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
-                                        stock_df.columns = ['price']
-                                        stock_df.to_csv(f"temp/{stock_col}.csv")
-                                else:
-                                    raw_stock = StockInfo(stock_col, 'NSE')
-                                    if not DEBUG:
 
-                                        sell_orders: list = raw_stock.get_quote["sell"]
-                                        zero_quantity = True
-                                        for item in sell_orders:
-                                            if item['quantity'] > 0:
-                                                zero_quantity = False
-                                            break
-                                        if zero_quantity:
-                                            continue
-                                    account.stocks_to_track[stock_col] = raw_stock
-                                    account.stocks_to_track[stock_col].remaining_allocation = get_allocation()
-                                    # even if it may seem that allocation is reduced when bought, actual change is while adding the
-                                    # stock in stocks to track
-                                    account.available_cash -= get_allocation()
-                                    # _, _2 = account.stocks_to_track[stock_col].buy_parameters()
-                                    stock_df = prediction_df[[f"{stock_col}.NS"]]
-                                    stock_df.reset_index(inplace=True, drop=True)
-                                    stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
-                                    stock_df.columns = ['price']
-                                    stock_df.to_csv(f"temp/{stock_col}.csv")
 
                 """
                     update price for all the stocks which are being tracked
@@ -256,32 +240,32 @@ async def background_task():
                     position: Position = account.positions[position_name]
                     status = position.breached()
                     match status:
-                        case "DAY1BREACHED":
-                            logger.info(f" DAY1BREACHED -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                        case "SELL_PROFIT":
+                            logger.info(f" profit -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                            logger.info(f"obtained from property {position.stock.number_of_days}")
+                            logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
+                            if 1+(position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20):
+                                logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                                # if its in holding then fund is added next day else for position its added same day
+                                if position.stock.number_of_days == 1:
+                                    account.available_cash += get_allocation()
+                                os.remove(f"temp/{position_name}.csv")
+                            else:
+                                account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
-                            logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
-                            account.available_cash += get_allocation()
 
-                        case "DAYNBREACHED":
-                            logger.info(f" DAYNBREACHED -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                        case "SELL_LOSS":
+                            logger.info(f" loss -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                            account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
-                            logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
 
-                            # if one third amount breaches then remaining two third cash can be used
-                            if account.stocks_to_track[position_name].remaining_allocation > 0:
-                                account.available_cash += account.stocks_to_track[position_name].remaining_allocation
                         case "CONTINUE":
                             continue
 
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
                     today_profit += float(account.stocks_to_track[position_name].wallet)
-                    if position_name in account.short_positions.keys():
-                        account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
-                        del account.stocks_to_track[position_name]  # delete from stocks to track
-                    else:
-                        del account.stocks_to_track[position_name]  # delete from stocks to track
-                        os.remove(f"temp/{position_name}.csv")
+                    del account.stocks_to_track[position_name]  # delete from stocks to track
 
                 for stock in account.short_stocks_to_track.keys():
                     account.short_stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
@@ -296,40 +280,28 @@ async def background_task():
                     short_position: Position = account.short_positions[short_position_name]
                     status = short_position.breached()
                     match status:
-                        case "SQUARED_OFF":
-                            logger.info(f" SQUARED OFF SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
-                            short_positions_to_delete.append(short_position_name)
-                            if short_position_name in account.stocks_to_track.keys():
-                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
+                        case "BUY_PROFIT":
+                            logger.info(f" buy short in profit --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                            if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
+                                logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                if short_position.stock.number_of_days == 1:
+                                    account.available_cash += get_allocation()
+                                os.remove(f"temp/{short_position_name}.csv")
                             else:
-                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                                account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
+                            short_positions_to_delete.append(short_position_name)
 
-                        case "LOSS":
-                            logger.info(f" LOSS SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                        case "BUY_LOSS":
+                            logger.info(f" buy short in loss --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
+                            account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                             short_positions_to_delete.append(short_position_name)
-                            if short_position_name in account.stocks_to_track.keys():
-                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
-                            else:
-                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
-                        case "BUY_ANOTHER":
-                            logger.info(f" BUY ANOTHER SHORT --> buy {short_position.stock.stock_name} at {short_position.stock.latest_price}")
-                            short_positions_to_delete.append(short_position_name)
-                            if short_position_name in account.stocks_to_track.keys():
-                                logger.info(f"accumulated profit {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
-                            else:
-                                logger.info(f"accumulated profit {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
-                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                         case "CONTINUE":
                             continue
 
                 for short_position_name in short_positions_to_delete:
                     del account.short_positions[short_position_name]
-                    os.remove(f"temp/{short_position_name}.csv")
+                    today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                    del account.short_stocks_to_track[short_position_name]  # delete from stocks to track
 
                 if current_time > BUY_SHORTS:
                     short_positions_to_delete_at_end = []
@@ -337,18 +309,17 @@ async def background_task():
                         short_position: Position = account.short_positions[short_position_name]
 
                         if short_position.buy_short():
-                            if short_position_name in account.short_stocks_to_track.keys():
-                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
-                                short_positions_to_delete_at_end.append(short_position_name)
+                            today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                            if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
+                                logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                os.remove(f"temp/{short_position_name}.csv")
+                                del account.short_stocks_to_track[short_position_name]
                             else:
-                                today_profit += float(account.stocks_to_track[short_position_name].wallet)
-                                short_positions_to_delete_at_end.append(short_position_name)
+                                account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                         else:
                             logger.info(f"Error occurred while deleting {short_position_name}")
 
                     for short_position_name in short_positions_to_delete_at_end:
-                        if short_position_name in account.short_stocks_to_track.keys():
-                            os.remove(f"temp/{short_position_name}.csv")
                         del account.short_positions[short_position_name]
 
         except:
@@ -356,20 +327,20 @@ async def background_task():
 
     if DEBUG:
         short_positions_to_delete_at_end = []
+
         for short_position_name in account.short_positions.keys():
             short_position: Position = account.short_positions[short_position_name]
             if short_position.buy_short():
-                if short_position_name in account.short_stocks_to_track.keys():
-                    today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
-                    short_positions_to_delete_at_end.append(short_position_name)
+                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
+                if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
+                    logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                    os.remove(f"temp/{short_position_name}.csv")
+                    del account.short_stocks_to_track[short_position_name]
                 else:
-                    today_profit += float(account.stocks_to_track[short_position_name].wallet)
-                    short_positions_to_delete_at_end.append(short_position_name)
+                    account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
             else:
                 logger.info(f"Error occurred while deleting {short_position_name}")
         for short_position_name in short_positions_to_delete_at_end:
-            if short_position_name in account.short_stocks_to_track.keys():
-                os.remove(f"temp/{short_position_name}.csv")
             del account.short_positions[short_position_name]
 
     # sell all the stocks which has trigger and is not None
@@ -381,28 +352,35 @@ async def background_task():
 
     for position_name in account.positions.keys():
         position: Position = account.positions[position_name]
-        if position.trigger is None:
-            logger.info(f"{position.stock.stock_name}, {position.stock.latest_price}, {position.cost}")
-            if position.stock.latest_price > position.cost:
+        if position.stock.number_of_days == 1:
+            if position.trigger is None:
+                if position.stock.latest_price > position.cost:
+                    if position.sell():
+                        logger.info(f" crossed the cost -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                        positions_to_delete.append(position_name)
+                        account.available_cash += get_allocation()
+                        today_profit += float(account.stocks_to_track[position_name].wallet)
+                        del account.stocks_to_track[position_name]  # delete from stocks to track
+                else:
+                    tx_cost = position.stock.transaction_cost(buying_price=position.position_price, selling_price=position.current_price) / position.quantity
+                    wallet_value = (position.current_price - (position.position_price + tx_cost)) * position.quantity
+                    wallet_order[wallet_value] = position_name
+            else:
                 if position.sell():
-                    logger.info(f" crossed the cost -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+                    logger.info(f" BREACHED at the end of day -->sell {position.stock.stock_name} at {position.stock.latest_price}")
                     positions_to_delete.append(position_name)
                     logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
                     account.available_cash += get_allocation()
                     today_profit += float(account.stocks_to_track[position_name].wallet)
                     del account.stocks_to_track[position_name]  # delete from stocks to track
-            else:
-                tx_cost = position.stock.transaction_cost(buying_price=position.position_price, selling_price=position.current_price) / position.quantity
-                wallet_value = (position.current_price - (position.position_price + tx_cost)) * position.quantity
-                wallet_order[wallet_value] = position_name
         else:
-            if position.sell():
-                logger.info(f" BREACHED at the end of day -->sell {position.stock.stock_name} at {position.stock.latest_price}")
-                positions_to_delete.append(position_name)
-                logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
-                account.available_cash += get_allocation()
-                today_profit += float(account.stocks_to_track[position_name].wallet)
-                del account.stocks_to_track[position_name]  # delete from stocks to track
+            if 1+(position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20):
+                if position.sell():
+                    positions_to_delete.append(position_name)
+                    logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                    account.available_cash += get_allocation()
+                    today_profit += float(account.stocks_to_track[position_name].wallet)
+                    del account.stocks_to_track[position_name]  # delete from stocks to track
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
