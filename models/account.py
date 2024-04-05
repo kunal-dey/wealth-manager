@@ -116,7 +116,7 @@ class Account:
 
     def short_stocks(self):
         for stock_key in list(self.short_stocks_to_track.keys()):
-            if stock_key not in self.short_positions.keys():
+            if stock_key not in list(self.short_positions.keys()):
                 quantity, sell_price = self.short_stocks_to_track[stock_key].short_parameters()
                 logger.info(f"parameters for {stock_key}: {quantity} , sell price :{sell_price}")
                 if self.short_stocks_to_track[stock_key].whether_short():
@@ -129,31 +129,13 @@ class Account:
                         logger.info(f"{self.short_stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
                         self.short_positions[stock_key] = Position(
                                     position_price=sell_price,
-                                    stock=self.stocks_to_track[stock_key],
+                                    stock=self.short_stocks_to_track[stock_key],
                                     position_type=PositionType.SHORT,
                                     quantity=int(quantity),
                                     product_type=ProductType.INTRADAY
                                 )
-        # for stock_key in list(self.stocks_to_track.keys()):
-        #     if not self.stocks_to_track[stock_key].first_load and self.stocks_to_track[stock_key].remaining_allocation > 0:
-        #         quantity, sell_price = self.stocks_to_track[stock_key].short_parameters()
-        #         logger.info(f"parameters for {stock_key}: {quantity} , sell price :{sell_price}")
-        #         if stock_key in self.positions.keys() and stock_key not in self.short_positions.keys():
-        #             if self.stocks_to_track[stock_key].whether_short():
-        #                 if short(
-        #                     symbol=self.stocks_to_track[stock_key].stock_name,
-        #                     quantity=int(quantity),
-        #                     product_type=ProductType.INTRADAY,
-        #                     exchange=self.stocks_to_track[stock_key].exchange
-        #                 ):
-        #                     logger.info(f"{self.stocks_to_track[stock_key].stock_name} has has been short @ {sell_price}.")
-        #                     self.short_positions[stock_key] = Position(
-        #                             position_price=sell_price,
-        #                             stock=self.stocks_to_track[stock_key],
-        #                             position_type=PositionType.SHORT,
-        #                             quantity=int(quantity),
-        #                             product_type=ProductType.INTRADAY
-        #                         )
+                        logger.info(f"short positions add: {self.short_positions}")
+        logger.info(f"short positions after loop: {self.short_positions}")
 
     def convert_positions_to_holdings(self):
         """

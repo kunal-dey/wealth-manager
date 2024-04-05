@@ -184,6 +184,8 @@ async def background_task():
                 logger.info(f"available cash : {account.available_cash}")
 
                 logger.info(f"list of the stocks to track: {account.stocks_to_track.keys()}")
+                logger.info(f"list of the short stocks to track: {account.short_stocks_to_track.keys()}")
+                logger.info(f"short positions {account.short_positions}")
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
                     # selecting stock which meets the criteria
@@ -214,8 +216,6 @@ async def background_task():
                                 stock_df.columns = ['price']
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
 
-
-
                 """
                     update price for all the stocks which are being tracked
                 """
@@ -229,6 +229,8 @@ async def background_task():
                         account.short_stocks()
                     except:
                         pass
+
+                logger.info(f"after bought short positions {account.short_positions}")
 
                 """
                     if the trigger for selling is breached in position then sell
@@ -267,6 +269,8 @@ async def background_task():
                     today_profit += float(account.stocks_to_track[position_name].wallet)
                     del account.stocks_to_track[position_name]  # delete from stocks to track
 
+                logger.info(f"short positions before update price {account.short_positions}")
+
                 for stock in account.short_stocks_to_track.keys():
                     account.short_stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
 
@@ -302,6 +306,8 @@ async def background_task():
                     del account.short_positions[short_position_name]
                     today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                     del account.short_stocks_to_track[short_position_name]  # delete from stocks to track
+
+                logger.info(f"after breach short positions {account.short_positions}")
 
                 if current_time > BUY_SHORTS:
                     short_positions_to_delete_at_end = []
