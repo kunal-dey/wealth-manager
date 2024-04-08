@@ -216,6 +216,9 @@ async def background_task():
                                 stock_df.columns = ['price']
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
 
+                                logger.info("whether actually the stock df has all the data or not")
+                                logger.info(f"{stock_col}: {stock_df}")
+
                 """
                     update price for all the stocks which are being tracked
                 """
@@ -244,7 +247,6 @@ async def background_task():
                     match status:
                         case "SELL_PROFIT":
                             logger.info(f" profit -->sell {position.stock.stock_name} at {position.stock.latest_price}")
-                            logger.info(f"obtained from property {position.stock.number_of_days}")
                             logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
                             if 1+(position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20):
                                 logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
@@ -268,8 +270,6 @@ async def background_task():
                     del account.positions[position_name]
                     today_profit += float(account.stocks_to_track[position_name].wallet)
                     del account.stocks_to_track[position_name]  # delete from stocks to track
-
-                logger.info(f"short positions before update price {account.short_positions}")
 
                 for stock in account.short_stocks_to_track.keys():
                     account.short_stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
@@ -306,8 +306,6 @@ async def background_task():
                     del account.short_positions[short_position_name]
                     today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                     del account.short_stocks_to_track[short_position_name]  # delete from stocks to track
-
-                logger.info(f"after breach short positions {account.short_positions}")
 
                 if current_time > BUY_SHORTS:
                     short_positions_to_delete_at_end = []

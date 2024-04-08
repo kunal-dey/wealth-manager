@@ -230,6 +230,7 @@ class StockInfo:
             self.__result_stock_df = pd.read_csv(f"temp/{self.stock_name}.csv")
             self.__result_stock_df.drop(self.__result_stock_df.columns[0], axis=1, inplace=True)
         except FileNotFoundError:
+            logger.info(f"file not found while updating stock df")
             self.__result_stock_df = None
         stock_df = pd.DataFrame({"price": [current_price]})
         if self.__result_stock_df is not None:
@@ -253,6 +254,9 @@ class StockInfo:
             coefficient = np.polyfit(index, col.values, 1)
             ini = coefficient[0] * index[0] + coefficient[1]
             return coefficient[0] / ini
+
+        logger.info(f"to check whether this function is entered or not")
+        logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
 
         if self.__result_stock_df.shape[0] > 60:
             if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:

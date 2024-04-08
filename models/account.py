@@ -82,6 +82,7 @@ class Account:
                 quantity, buy_price = self.stocks_to_track[stock_key].buy_parameters()
                 logger.info(f"parameters for {stock_key}: {quantity} {buy_price}")
                 buy_status = self.stocks_to_track[stock_key].whether_buy()
+                logger.info(f"to check whether the buy status is returned {buy_status}")
                 if buy_status:
                     if long(
                         symbol=self.stocks_to_track[stock_key].stock_name,
@@ -106,10 +107,15 @@ class Account:
                         self.stocks_to_track[stock_key].last_buy_price = buy_price
                         self.stocks_to_track[stock_key].last_quantity = quantity
                 else:
+                    logger.info("entered the first load logic to delete the file")
                     if self.stocks_to_track[stock_key].first_load:
                         self.available_cash += get_allocation()
                         stocks_to_delete.append(stock_key)
-                        os.remove(f"temp/{stock_key}.csv")
+                        try:
+                            os.remove(f"temp/{stock_key}.csv")
+                        except:
+                            logger.info("not able to delete")
+                            pass
 
         for stock_key in stocks_to_delete:
             del self.stocks_to_track[stock_key]
