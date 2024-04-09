@@ -112,7 +112,7 @@ class Account:
                         self.available_cash += get_allocation()
                         stocks_to_delete.append(stock_key)
                         try:
-                            os.remove(f"temp/{stock_key}.csv")
+                            os.remove(os.getcwd() + f"/temp/{stock_key}.csv")
                         except:
                             logger.info("not able to delete")
                             pass

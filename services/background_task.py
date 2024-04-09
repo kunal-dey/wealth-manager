@@ -217,7 +217,7 @@ async def background_task():
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
 
                                 logger.info("whether actually the stock df has all the data or not")
-                                logger.info(f"{stock_col}: {stock_df}")
+                                logger.info(f"{stock_col}: {stock_df.shape}")
 
                 """
                     update price for all the stocks which are being tracked
@@ -253,7 +253,7 @@ async def background_task():
                                 # if its in holding then fund is added next day else for position its added same day
                                 if position.stock.number_of_days == 1:
                                     account.available_cash += get_allocation()
-                                os.remove(f"temp/{position_name}.csv")
+                                os.remove(os.getcwd() + f"/temp/{position_name}.csv")
                             else:
                                 account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
@@ -290,7 +290,7 @@ async def background_task():
                                 logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
                                 if short_position.stock.number_of_days == 1:
                                     account.available_cash += get_allocation()
-                                os.remove(f"temp/{short_position_name}.csv")
+                                os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                             else:
                                 account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                             short_positions_to_delete.append(short_position_name)
@@ -316,7 +316,7 @@ async def background_task():
                             today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                             if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
                                 logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                                os.remove(f"temp/{short_position_name}.csv")
+                                os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                                 del account.short_stocks_to_track[short_position_name]
                             else:
                                 account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
@@ -338,7 +338,7 @@ async def background_task():
                 today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                 if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
                     logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
-                    os.remove(f"temp/{short_position_name}.csv")
+                    os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                     del account.short_stocks_to_track[short_position_name]
                 else:
                     account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
@@ -388,7 +388,7 @@ async def background_task():
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
-        os.remove(f"temp/{position_name}.csv")
+        os.remove(os.getcwd() + f"/temp/{position_name}.csv")
 
     # # to store all the stock with wallet value in ascending order
     # wallet_order = {float(account.stocks_to_track[st].wallet): st for st in account.stocks_to_track.keys()}
@@ -411,7 +411,7 @@ async def background_task():
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
-        os.remove(f"temp/{position_name}.csv")
+        os.remove(os.getcwd() + f"/temp/{position_name}.csv")
 
     """
         END OF DAY ACTIVITIES
