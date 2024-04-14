@@ -111,11 +111,7 @@ class Account:
                     if self.stocks_to_track[stock_key].first_load:
                         self.available_cash += get_allocation()
                         stocks_to_delete.append(stock_key)
-                        try:
-                            os.remove(os.getcwd() + f"/temp/{stock_key}.csv")
-                        except:
-                            logger.info("not able to delete")
-                            pass
+                        os.remove(os.getcwd() + f"/temp/{stock_key}.csv")
 
         for stock_key in stocks_to_delete:
             del self.stocks_to_track[stock_key]

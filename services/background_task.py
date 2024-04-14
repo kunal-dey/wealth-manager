@@ -58,9 +58,6 @@ async def background_task():
     for stock_obj in stock_list:
         account.stocks_to_track[stock_obj.stock_name] = stock_obj
 
-    # ignoring all two third stores
-    account.available_cash = account.available_cash - len(stock_list)*get_allocation()
-
     # load all holdings from the database
     await account.load_holdings()
 
@@ -92,6 +89,10 @@ async def background_task():
 
     initial_list_of_holdings = list(account.holdings.keys())
     initial_list_of_stocks = list(account.stocks_to_track.keys())
+
+    # setting the starting cash and available cash
+    account.starting_cash = account.starting_cash + len(initial_list_of_holdings)*get_allocation()
+    account.available_cash = account.available_cash - (len(initial_list_of_stocks)-len(initial_list_of_holdings))*get_allocation()
 
     # this is done as mostly we are storing holding and trade occurs as positions
     account.convert_holdings_to_positions()
@@ -207,6 +208,7 @@ async def background_task():
                                     if zero_quantity:
                                         continue
                                 account.stocks_to_track[stock_col] = raw_stock
+                                _, _2 = account.stocks_to_track[stock_col].buy_parameters()
                                 # even if it may seem that allocation is reduced when bought, actual change is while adding the
                                 # stock in stocks to track
                                 account.available_cash -= get_allocation()
@@ -224,6 +226,7 @@ async def background_task():
                 """
 
                 for stock in account.stocks_to_track.keys():
+                    logger.info(f"stock to update {stock}")
                     account.stocks_to_track[stock].update_price(selected_long_stocks, selected_short_stocks)
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
@@ -318,13 +321,17 @@ async def background_task():
                                 logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
                                 os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                                 del account.short_stocks_to_track[short_position_name]
-                            else:
-                                account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
+                            # else:
+                            #     account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                         else:
                             logger.info(f"Error occurred while deleting {short_position_name}")
 
                     for short_position_name in short_positions_to_delete_at_end:
                         del account.short_positions[short_position_name]
+
+                    for stock_to_transfer in account.short_stocks_to_track.keys():
+                        account.stocks_to_track[stock_to_transfer] = account.short_stocks_to_track[stock_to_transfer]
+                        del account.short_stocks_to_track[stock_to_transfer]
 
         except:
             logger.exception("Kite error may have happened")
@@ -340,12 +347,16 @@ async def background_task():
                     logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
                     os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                     del account.short_stocks_to_track[short_position_name]
-                else:
-                    account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
+                # else:
+                #     account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
             else:
                 logger.info(f"Error occurred while deleting {short_position_name}")
         for short_position_name in short_positions_to_delete_at_end:
             del account.short_positions[short_position_name]
+
+        for stock_to_transfer in account.short_stocks_to_track.keys():
+            account.stocks_to_track[stock_to_transfer] = account.short_stocks_to_track[stock_to_transfer]
+            del account.short_stocks_to_track[stock_to_transfer]
 
     # sell all the stocks which has trigger and is not None
 

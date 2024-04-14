@@ -177,7 +177,6 @@ class Stage:
             selling_price = self.current_price
             tx_cost = self.stock.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
             wallet_value = selling_price - (buy_price + tx_cost)
-            logger.info(f"Wallet: {wallet_value}")
             logger.info(f"{self.stock.stock_name} Earlier trigger:  {self.trigger}, latest price:{self.current_price}")
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
@@ -196,7 +195,7 @@ class Stage:
                                 return "SELL_PROFIT"
             else:
                 if self.current_price < self.stock.last_buy_price * 0.995:
-                    if self.stock.whether_short():
+                    if self.current_price < self.stock.last_buy_price * 0.98:
                         if DEBUG:
                             if self.sell():
                                 return "SELL_LOSS"
@@ -205,6 +204,16 @@ class Stage:
                             if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
                                 if self.sell():
                                     return "SELL_LOSS"
+                    else:
+                        if self.stock.whether_short():
+                            if DEBUG:
+                                if self.sell():
+                                    return "SELL_LOSS"
+                            else:
+                                s_orders: list = self.stock.get_quote["sell"]
+                                if sum([order['orders'] * order['quantity'] for order in s_orders]) > self.quantity:
+                                    if self.sell():
+                                        return "SELL_LOSS"
 
             self.set_trigger(self.current_price)
             return "CONTINUE"

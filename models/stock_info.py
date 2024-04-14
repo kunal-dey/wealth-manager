@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from logging import Logger
 from time import sleep
@@ -91,6 +92,7 @@ class StockInfo:
                     return response.json()['data']
                 else:
                     quote: dict = self.get_quote
+                    logger.info(f"get quote {self.stock_name} : {quote}, inposition {self.in_position}")
                     if self.in_position:
                         orders: list = quote["buy"]
                     else:
@@ -99,6 +101,7 @@ class StockInfo:
                     for item in orders:
                         for order_no in range(1, item["orders"] + 1):
                             for _ in range(1, item["quantity"] + 1):
+                                logger.info(f"{quantity}, {self.quantity}")
                                 if quantity + 1 > self.quantity:
                                     return accumulated / quantity
                                 accumulated += item["price"]
@@ -169,6 +172,7 @@ class StockInfo:
             self.latest_price = current_price
         if self.latest_price is not None:
             self.update_stock_df(self.latest_price)
+        logger.info(self.__result_stock_df)
 
     def buy_parameters(self):
         amount: float = MAXIMUM_ALLOCATION
@@ -256,6 +260,7 @@ class StockInfo:
             return coefficient[0] / ini
 
         logger.info(f"to check whether this function is entered or not")
+        logger.info(self.__result_stock_df)
         logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
 
         if self.__result_stock_df.shape[0] > 60:

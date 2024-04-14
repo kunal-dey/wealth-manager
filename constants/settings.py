@@ -1,6 +1,6 @@
 from datetime import datetime
 
-DEBUG = True
+DEBUG = False
 
 # time settings
 __current_time = datetime.now()
@@ -19,10 +19,10 @@ if DEBUG:
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 23, 58, 0)
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
-    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 30, 0)
+    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
-    STOP_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 0, 0)
-    BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
+    STOP_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
+    BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)
 
 SLEEP_INTERVAL = 1 if DEBUG else 45
 

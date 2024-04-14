@@ -40,7 +40,6 @@ pymongo==4.5.0
 pyOpenSSL==23.2.0
 python-dateutil==2.8.2
 pytz==2023.3.post1
-pywin32==306
 quart==0.18.0
 quart-cors==0.6.0
 requests==2.31.0
@@ -48,7 +47,6 @@ service-identity==23.1.0
 six==1.16.0
 soupsieve==2.5
 Twisted==23.8.0
-twisted-iocpsupport==1.0.4
 txaio==23.1.1
 typing_extensions==4.7.1
 tzdata==2023.3
