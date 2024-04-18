@@ -19,7 +19,7 @@ if DEBUG:
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 23, 58, 0)
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
-    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
+    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 20, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
     STOP_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)

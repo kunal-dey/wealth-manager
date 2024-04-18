@@ -221,6 +221,32 @@ async def background_task():
                                 logger.info("whether actually the stock df has all the data or not")
                                 logger.info(f"{stock_col}: {stock_df.shape}")
 
+                stocks_to_shift = []
+
+                for tracking_stock in list(account.stocks_to_track.keys()):
+                    if tracking_stock not in list(account.positions.keys()) and tracking_stock in selected_short_stocks:
+                        account.short_stocks_to_track[tracking_stock] = account.stocks_to_track[tracking_stock]
+                        stocks_to_shift.append(tracking_stock)
+
+                for tracking_stock in stocks_to_shift:
+                    del account.stocks_to_track[tracking_stock]
+
+                short_stocks_to_shift = []
+
+                for tracking_stock in list(account.short_stocks_to_track.keys()):
+                    if tracking_stock in selected_short_stocks:
+                        continue
+                    if tracking_stock not in list(account.short_positions.keys()) and tracking_stock in selected_long_stocks:
+                        account.stocks_to_track[tracking_stock] = account.short_stocks_to_track[tracking_stock]
+                        short_stocks_to_shift.append(tracking_stock)
+
+                logger.info("After shifting")
+                logger.info(f"list of the stocks to track: {account.stocks_to_track.keys()}")
+                logger.info(f"list of the short stocks to track: {account.short_stocks_to_track.keys()}")
+
+                for tracking_stock in short_stocks_to_shift:
+                    del account.short_stocks_to_track[tracking_stock]
+
                 """
                     update price for all the stocks which are being tracked
                 """
@@ -318,7 +344,7 @@ async def background_task():
                         if short_position.buy_short():
                             today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                             if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
-                                logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                                logger.info(f"breached stock wallet {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
                                 os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                                 del account.short_stocks_to_track[short_position_name]
                             # else:
@@ -329,8 +355,13 @@ async def background_task():
                     for short_position_name in short_positions_to_delete_at_end:
                         del account.short_positions[short_position_name]
 
+                    short_stock_to_delete = []
+
                     for stock_to_transfer in account.short_stocks_to_track.keys():
                         account.stocks_to_track[stock_to_transfer] = account.short_stocks_to_track[stock_to_transfer]
+                        short_stock_to_delete.append(stock_to_transfer)
+
+                    for stock_to_transfer in short_stock_to_delete:
                         del account.short_stocks_to_track[stock_to_transfer]
 
         except:
