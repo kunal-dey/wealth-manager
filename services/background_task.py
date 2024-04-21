@@ -347,6 +347,7 @@ async def background_task():
                                 logger.info(f"breached stock wallet {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
                                 os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                                 del account.short_stocks_to_track[short_position_name]
+                            short_positions_to_delete_at_end.append(short_position_name)
                             # else:
                             #     account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                         else:
@@ -378,6 +379,7 @@ async def background_task():
                     logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
                     os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                     del account.short_stocks_to_track[short_position_name]
+                short_positions_to_delete_at_end.append(short_position_name)
                 # else:
                 #     account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
             else:

@@ -195,7 +195,7 @@ class Stage:
                                 return "SELL_PROFIT"
             else:
                 if self.current_price < self.stock.last_buy_price * 0.995:
-                    if self.current_price < self.stock.last_buy_price * 0.98:
+                    if self.current_price < self.stock.last_buy_price * 0.99:
                         if DEBUG:
                             if self.sell():
                                 return "SELL_LOSS"
@@ -226,7 +226,7 @@ class Stage:
             logger.info(f"Wallet: {wallet_value}")
             logger.info(f"{self.stock.stock_name} Earlier short trigger:  {self.trigger}, latest price:{self.current_price}")
 
-            if selling_price * 1.02 < self.current_price:
+            if selling_price * 1.01 < self.current_price:
                 if DEBUG:
                     if self.buy_short():
                         return "BUY_LOSS"

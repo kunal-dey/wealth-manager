@@ -260,6 +260,9 @@ class StockInfo:
         logger.info(f"to check whether this function is entered or not")
         logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
 
+        if self.__result_stock_df is None:
+            return False
+
         if self.__result_stock_df.shape[0] > 60:
             if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
                 logger.info("entered on whether to buy the stock")
@@ -285,6 +288,8 @@ class StockInfo:
         ) / self.last_quantity
 
         logger.info(f"latest price {self.latest_price}, buy_cost {buy_cost}")
+        if self.__result_stock_df is None:
+            return False
 
         if self.__result_stock_df.shape[0] > 60:
             if (self.stock_name in self.chosen_short_stocks) and (self.stock_name not in self.chosen_long_stocks):
