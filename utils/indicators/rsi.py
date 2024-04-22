@@ -1,11 +1,13 @@
-def calculate_rsi(data, window=14):
+def calculate_rsi(data, window=60):
     """
     Calculates relative strength index
     :param data: a dataframe with the column named as line
     :param window: period over which rsi is calculated
     :return:
     """
-    close_price = data['line']
+    t = data.to_frame()
+    t.columns = ['line']
+    close_price = t['line']
     delta = close_price.diff()
 
     gain = delta.where(delta > 0, 0)
@@ -15,6 +17,7 @@ def calculate_rsi(data, window=14):
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
 
     rs = avg_gain / avg_loss
+
     rsi = 100 - (100 / (1 + rs))
 
     return rsi

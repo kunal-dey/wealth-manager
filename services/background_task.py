@@ -176,7 +176,14 @@ async def background_task():
                     prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
-                selected_long_stocks = [st[:-3] for st in predict_long_stocks(prediction_df)]
+                # listing those stocks first with less VaR
+                data_resampled = prediction_df.iloc[::60, :]
+                log_returns = data_resampled.pct_change()
+                VaR_95 = log_returns.quantile(0.005, interpolation='lower')
+                stock_list = predict_long_stocks(prediction_df)
+                predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
+
+                selected_long_stocks = [st[:-3] for st in predicted_stocks]
                 selected_short_stocks = [st[:-3] for st in predict_short_stocks(prediction_df)]
 
                 logger.info(f"chosen long: {selected_long_stocks}")

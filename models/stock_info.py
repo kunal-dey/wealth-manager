@@ -18,6 +18,7 @@ from models.db_models.object_models import get_save_to_db, get_delete_from_db, g
 from models.costs.delivery_trading_cost import DeliveryTransactionCost
 from models.costs.intraday_trading_cost import IntradayTransactionCost
 from utils.indicators.kaufman_indicator import kaufman_indicator
+from utils.indicators.rsi import calculate_rsi
 from utils.logger import get_logger
 from constants.settings import GENERATOR_URL, MAXIMUM_ALLOCATION
 
@@ -268,9 +269,12 @@ class StockInfo:
                 logger.info("entered on whether to buy the stock")
                 stock_df = self.__result_stock_df.copy()
                 line = stock_df.apply(kaufman_indicator)
+                rsi = self.__result_stock_df.apply(calculate_rsi)
+
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
                 if transformed.price.iloc[-1] > transformed.shift(1).price.iloc[-1] > 0:
-                    return True
+                    if rsi.price.iloc[-1] < 20:
+                        return True
         return False
 
     def whether_short(self) -> bool:
@@ -296,8 +300,10 @@ class StockInfo:
                 logger.info("short selection entered")
                 stock_df = self.__result_stock_df.copy()
                 line = stock_df.apply(kaufman_indicator)
+                rsi = self.__result_stock_df.apply(calculate_rsi)
                 transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
                 if transformed.price.iloc[-1] < transformed.shift(1).price.iloc[-1] < 0:
-                    return True
+                    if rsi.price.iloc[-1] > 80:
+                        return True
         return False
 
