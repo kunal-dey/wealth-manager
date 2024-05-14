@@ -91,8 +91,12 @@ async def background_task():
     initial_list_of_stocks = list(account.stocks_to_track.keys())
 
     # setting the starting cash and available cash
-    account.starting_cash = account.starting_cash + len(initial_list_of_holdings)*get_allocation()
-    account.available_cash = account.available_cash - (len(initial_list_of_stocks)-len(initial_list_of_holdings))*get_allocation()
+    if not DEBUG:
+        account.starting_cash = account.starting_cash + len(initial_list_of_holdings)*get_allocation()
+        account.available_cash = account.available_cash - (len(initial_list_of_stocks)-len(initial_list_of_holdings))*get_allocation()
+    else:
+        account.starting_cash = 150001
+        account.available_cash = account.starting_cash - len(initial_list_of_stocks)*get_allocation()
 
     # this is done as mostly we are storing holding and trade occurs as positions
     account.convert_holdings_to_positions()
@@ -290,6 +294,7 @@ async def background_task():
                                 if position.stock.number_of_days == 1:
                                     account.available_cash += get_allocation()
                                 os.remove(os.getcwd() + f"/temp/{position_name}.csv")
+                                today_profit += float(account.stocks_to_track[position_name].wallet)
                             else:
                                 account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
@@ -304,7 +309,6 @@ async def background_task():
 
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
-                    today_profit += float(account.stocks_to_track[position_name].wallet)
                     del account.stocks_to_track[position_name]  # delete from stocks to track
 
                 for stock in account.short_stocks_to_track.keys():
@@ -327,6 +331,7 @@ async def background_task():
                                 if short_position.stock.number_of_days == 1:
                                     account.available_cash += get_allocation()
                                 os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
+                                today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                             else:
                                 account.stocks_to_track[short_position_name] = account.short_stocks_to_track[short_position_name]
                             short_positions_to_delete.append(short_position_name)
@@ -340,7 +345,6 @@ async def background_task():
 
                 for short_position_name in short_positions_to_delete:
                     del account.short_positions[short_position_name]
-                    today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                     del account.short_stocks_to_track[short_position_name]  # delete from stocks to track
 
                 if current_time > BUY_SHORTS:
@@ -383,7 +387,7 @@ async def background_task():
             if short_position.buy_short():
                 today_profit += float(account.short_stocks_to_track[short_position_name].wallet)
                 if 1+(short_position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(short_position.stock.number_of_days/20):
-                    logger.info(f"breached stock wallet {short_position_name} {account.stocks_to_track[short_position_name].wallet}")
+                    logger.info(f"breached stock wallet {short_position_name} {account.short_stocks_to_track[short_position_name].wallet}")
                     os.remove(os.getcwd() + f"/temp/{short_position_name}.csv")
                     del account.short_stocks_to_track[short_position_name]
                 short_positions_to_delete_at_end.append(short_position_name)
@@ -394,8 +398,13 @@ async def background_task():
         for short_position_name in short_positions_to_delete_at_end:
             del account.short_positions[short_position_name]
 
+        short_stock_to_delete = []
+
         for stock_to_transfer in account.short_stocks_to_track.keys():
             account.stocks_to_track[stock_to_transfer] = account.short_stocks_to_track[stock_to_transfer]
+            short_stock_to_delete.append(stock_to_transfer)
+
+        for stock_to_transfer in short_stock_to_delete:
             del account.short_stocks_to_track[stock_to_transfer]
 
     # sell all the stocks which has trigger and is not None
@@ -415,7 +424,7 @@ async def background_task():
                         positions_to_delete.append(position_name)
                         account.available_cash += get_allocation()
                         today_profit += float(account.stocks_to_track[position_name].wallet)
-                        del account.stocks_to_track[position_name]  # delete from stocks to track
+                        # del account.stocks_to_track[position_name]  # delete from stocks to track
                 else:
                     tx_cost = position.stock.transaction_cost(buying_price=position.position_price, selling_price=position.current_price) / position.quantity
                     wallet_value = (position.current_price - (position.position_price + tx_cost)) * position.quantity
@@ -427,7 +436,6 @@ async def background_task():
                     logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
                     account.available_cash += get_allocation()
                     today_profit += float(account.stocks_to_track[position_name].wallet)
-                    del account.stocks_to_track[position_name]  # delete from stocks to track
         else:
             if 1+(position.stock.wallet/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20):
                 if position.sell():
@@ -435,11 +443,13 @@ async def background_task():
                     logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
                     account.available_cash += get_allocation()
                     today_profit += float(account.stocks_to_track[position_name].wallet)
-                    del account.stocks_to_track[position_name]  # delete from stocks to track
+                    # del account.stocks_to_track[position_name]  # delete from stocks to track
 
     for position_name in positions_to_delete:
         del account.positions[position_name]
-        os.remove(os.getcwd() + f"/temp/{position_name}.csv")
+        if account.stocks_to_track[position_name].wallet > 0:
+            del account.stocks_to_track[position_name]  # delete from stocks to track
+            os.remove(os.getcwd() + f"/temp/{position_name}.csv")
 
     # # to store all the stock with wallet value in ascending order
     # wallet_order = {float(account.stocks_to_track[st].wallet): st for st in account.stocks_to_track.keys()}
@@ -490,5 +500,7 @@ async def background_task():
 
     # deleting all holding data from db which have been sold
     await account.remove_all_sold_holdings(initial_list_of_holdings)
+
+    logger.info(f"Today's profit {today_profit}")
 
     logger.info("TASK ENDED")
