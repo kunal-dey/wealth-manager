@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def kaufman_indicator(price: pd.Series, n=10, pow1=1, pow2=30):
+def kaufman_indicator(price: pd.Series, n=5, pow1=1, pow2=20):
     """
     Given a dataframe, it returns the list of the Kaufman indicator values.
 

@@ -64,7 +64,7 @@ async def start_process():
     """
     try:
         # to test whether the access toke has been set after login
-        _ = kite_context.ltp("NSE:INFY")
+        # _ = kite_context.ltp("NSE:INFY")
 
         # starting the background task which will run the entire process
         app.add_background_task(background_task)
@@ -94,8 +94,6 @@ async def train():
 
     def training():
         train_model(obtained_stock_list)
-        sleep(10)
-        train_model(obtained_stock_list, short=True)
 
     # starting the training process
     app.add_background_task(training)

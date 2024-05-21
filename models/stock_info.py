@@ -160,7 +160,7 @@ class StockInfo:
                     quantity=self.quantity
                 ).total_tax_and_charges
 
-    def update_price(self, chosen_long_stocks, chosen_short_stocks):
+    def update_price(self):
         """
         This is required to update the latest price.
 
@@ -171,9 +171,6 @@ class StockInfo:
 
         :return: None
         """
-
-        self.chosen_long_stocks = chosen_long_stocks
-        self.chosen_short_stocks = chosen_short_stocks
         current_price = self.current_price
         if current_price == 'ENDED':
             set_end_process(True)
@@ -198,40 +195,15 @@ class StockInfo:
                         quantity += 1
             return quantity, accumulated / quantity
 
-        quote: dict = self.get_quote
-        sell_orders: list = quote["sell"]
         if DEBUG:
             if self.latest_price:
                 self.quantity, price = int(amount / self.latest_price), self.latest_price
             else:
                 self.quantity, price = 0, 0
         else:
+            quote: dict = self.get_quote
+            sell_orders: list = quote["sell"]
             self.quantity, price = get_quantity_and_price(sell_orders)
-        return self.quantity, price
-
-    def short_parameters(self):
-        amount: float = MAXIMUM_ALLOCATION
-
-        def get_quantity_and_price(b_orders):
-            accumulated, quantity = 0, 0
-            for item in b_orders:
-                for order_no in range(1, item["orders"] + 1):
-                    for _ in range(1, item["quantity"] + 1):
-                        if accumulated + item["price"] > amount:
-                            return quantity, accumulated / quantity
-                        accumulated += item["price"]
-                        quantity += 1
-            return quantity, accumulated / quantity
-
-        quote: dict = self.get_quote
-        buy_orders: list = quote["buy"]
-        if DEBUG:
-            if self.latest_price:
-                self.quantity, price = int(amount / self.latest_price), self.latest_price
-            else:
-                self.quantity, price = 0, 0
-        else:
-            self.quantity, price = get_quantity_and_price(buy_orders)
         return self.quantity, price
 
     def update_stock_df(self, current_price: float):
@@ -258,8 +230,7 @@ class StockInfo:
     def get_ohlc(self):
         data = self.__result_stock_df.copy()
         # since a check is needed to verify whether the trend actually reversed or not
-        data = data.iloc[-180:-4]
-        window = 5
+        window = len(data)
 
         # Apply a rolling window of 15 minutes
         rolling_data = data['price'].rolling(window=window)
@@ -281,7 +252,7 @@ class StockInfo:
         # Drop any rows with NaN values which occur at the start of the dataset
         return ohlcv_data.dropna()
 
-    def whether_buy(self) -> bool:
+    def whether_buy(self, day_based_df) -> bool:
         """
         Buy the stock if certain conditions are met:
         1. If total buying quantity/ total selling quantity > 0.8 then buy
@@ -289,6 +260,7 @@ class StockInfo:
         3. The current price is not more than 1% of the trigger price
         :return: True, if buy else false
         """
+
         def get_slope(col):
             index = list(col.index)
             coefficient = np.polyfit(index, col.values, 1)
@@ -298,12 +270,21 @@ class StockInfo:
         logger.info(f"to check whether this function is entered or not")
         logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
 
-        if self.__result_stock_df is None:
+        multiindex_columns = day_based_df.columns
+
+        if self.__result_stock_df is None and self.__result_stock_df.shape[0] < 15:
             return False
 
         default_ohlc = ['Open', 'High', 'Low', 'Close']
 
+        columns_for_level2 = [col for col in multiindex_columns if
+                              col[1] == f'{self.stock_name}.NS' and col[0] in default_ohlc]
+        d = day_based_df[columns_for_level2]
+        d.columns = [col[0] for col in columns_for_level2]
+
         ohlc_data = self.get_ohlc()
+
+        ohlc_data = pd.concat([d, ohlc_data.iloc[-1:]], ignore_index=True)
 
         candl = BullishEngulfing(target='pattern0')
         ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
@@ -314,17 +295,11 @@ class StockInfo:
         candl = MorningStar(target='pattern2')
         ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
 
-        # candl = Doji(target='pattern3')
-        # ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
         candl = Hammer(target='pattern4')
         ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
 
         candl = InvertedHammer(target='pattern5')
         ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-        #
-        # candl = ShootingStar(target='pattern6')
-        # ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
 
         regex = re.compile('pattern', re.IGNORECASE)
 
@@ -334,82 +309,38 @@ class StockInfo:
         if True in list(ohlc_data[matching_columns].iloc[-1]):
             logger.info("found")
 
-        if self.__result_stock_df.shape[0] > 60:
-            if self.first_load:
-                # if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
+        if self.__result_stock_df.shape[0] > 15:
+            # if self.first_load:
+            # if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
+
+            line_df = ohlc_data.copy()
+            line_df = line_df[['Close']]
+            line_df.columns = ['price']
+            line_df['line'] = line_df.apply(kaufman_indicator)
+            line_df['ema'] = line_df.line.ewm(span=5, adjust=False).mean()
+
+            # logger.info(list(line_df['ema'] < line_df['ema'].shift(-1))[-1])
+            # logger.info(ohlc_data)
+
+            if True in list(ohlc_data[matching_columns].iloc[-1]):
                 logger.info("entered on whether to buy the stock")
-                stock_df = self.__result_stock_df.copy()
-                line = stock_df.apply(kaufman_indicator)
-                # rsi = self.__result_stock_df.apply(calculate_rsi
-                transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-                if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
-                    if True in list(ohlc_data[matching_columns].iloc[-1]):
-                        if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
-                            return True
-            else:
-                logger.info("entered on whether to buy the stock")
-                stock_df = self.__result_stock_df.copy()
-                line = stock_df.apply(kaufman_indicator)
-                # rsi = self.__result_stock_df.apply(calculate_rsi)
-
-                transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-                if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
-                    if True in list(ohlc_data[matching_columns].iloc[-1]):
-                        if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
-                            return True
-        return False
-
-    def whether_short(self) -> bool:
-
-        def get_slope(col):
-            index = list(col.index)
-            coefficient = np.polyfit(index, col.values, 1)
-            ini = coefficient[0] * index[0] + coefficient[1]
-            return coefficient[0] / ini
-
-        if self.__result_stock_df is None:
-            return False
-
-        if self.__result_stock_df.shape[0] > 60:
-            # if (self.stock_name in self.chosen_short_stocks) and (self.stock_name not in self.chosen_long_stocks):
-            logger.info("short selection entered")
-            stock_df = self.__result_stock_df.copy()
-            line = stock_df.apply(kaufman_indicator)
-            # transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-            # before the pattern it should increase but after it should decrease
-            if line.price.iloc[-10] > line.shift(4).price.iloc[-1]:
-
-                default_ohlc = ['Open', 'High', 'Low', 'Close']
-
-                ohlc_data = self.get_ohlc()
-
-                candl = BearishEngulfing(target='pattern0')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                candl = BearishHarami(target='pattern1')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                candl = DarkCloudCover(target='pattern2')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                # candl = Doji(target='pattern3')
-                # ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                candl = EveningStar(target='pattern4')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                candl = PiercingPattern(target='pattern5')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                candl = ShootingStar(target='pattern6')
-                ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
-
-                regex = re.compile('pattern', re.IGNORECASE)
-
-                # Filter columns where the column name matches the regex pattern
-                matching_columns = [col for col in ohlc_data.columns if regex.search(col)]
-
-                if True in list(ohlc_data[matching_columns].iloc[-1]):
-                    if line.price.iloc[-1] < line.shift(1).price.iloc[-1]:
-                        return True
+                # stock_df = self.__result_stock_df.copy()
+                # line = stock_df.apply(kaufman_indicator)
+                # # rsi = self.__result_stock_df.apply(calculate_rsi
+                # transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
+                # if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
+                #     if True in list(ohlc_data[matching_columns].iloc[-1]):
+                #         if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
+                return True
+        # else:
+        #     logger.info("entered on whether to buy the stock")
+        #     stock_df = self.__result_stock_df.copy()
+        #     line = stock_df.apply(kaufman_indicator)
+        #     # rsi = self.__result_stock_df.apply(calculate_rsi)
+        #
+        #     transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
+        #     if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
+        #         if True in list(ohlc_data[matching_columns].iloc[-1]):
+        #             if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
+        #                 return True
         return False

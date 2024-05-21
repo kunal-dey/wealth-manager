@@ -10,7 +10,10 @@ from utils.logger import get_logger
 logger: Logger = get_logger(__name__)
 
 
-def generate_data(day_based_data, min_based_data, short=False):
+def generate_data(stock_df):
+    """
+        stock_df should contain price as one column
+    """
 
     def get_slope(col):
         index = list(col.index)
@@ -25,78 +28,60 @@ def generate_data(day_based_data, min_based_data, short=False):
         :return:
         """
         returns = (x.pct_change()+1).cumprod()
-        if short:
-            return 0 if returns[returns < 0.985].shape[0] == 0 else 1
-        else:
-            return 0 if returns[returns > 1.02].shape[0] == 0 else 1
+        return 0 if returns[returns > 1.01].shape[0] == 0 else 1
 
-    def filtered_single_stock_data(stock_name: str):
-        stock_df = min_based_data[[stock_name]].copy()
-        stock_df.columns = ['price']
-        day_returns = day_based_data[[stock_name]].copy()
-        day_returns.columns = ['price']
+    col_with_period = {
+        '3mo': 66,
+        '1mo': 22,
+        '1wk': 5,
+        '3d': 3
+    }
 
-        # temporary day based df to cache data for min based df
-        day_returns['3mo'] = day_returns.reset_index(drop=True).price.rolling(66).apply(get_slope).values
-        day_returns['1mo'] = day_returns.reset_index(drop=True).price.rolling(22).apply(get_slope).values
-        day_returns['1wk'] = day_returns.reset_index(drop=True).price.rolling(5).apply(get_slope).values
-        day_returns['3d'] = day_returns.reset_index(drop=True).price.rolling(3).apply(get_slope).values
+    shifts = [sh for sh in range(5)]
+    gen_cols = []
 
-        # generating the stock df with necessary input fields
-        stock_df['3mo_return'] = stock_df['price'].rolling(1).apply(lambda x: day_returns['3mo'].loc[str(x.index[0].date())])
-        stock_df['1mo_return'] = stock_df['price'].rolling(1).apply(lambda x: day_returns['1mo'].loc[str(x.index[0].date())])
-        stock_df['1wk_return'] = stock_df['price'].rolling(1).apply(lambda x: day_returns['1wk'].loc[str(x.index[0].date())])
-        stock_df['3d_return'] = stock_df['price'].rolling(1).apply(lambda x: day_returns['3d'].loc[str(x.index[0].date())])
-        stock_df['1d_return'] = stock_df['price'].reset_index(drop=True).rolling(375).apply(get_slope).values
-        stock_df['2hr_return'] = stock_df['price'].reset_index(drop=True).rolling(120).apply(get_slope).values
-        stock_df['10m_return'] = stock_df['price'].reset_index(drop=True).rolling(10).apply(get_slope).values
-        stock_df['2hr_vol'] = stock_df['price'].rolling(120).apply(lambda x: x.std()/x.iloc[0])
-        stock_df['10m_vol'] = stock_df['price'].rolling(10).apply(lambda x: x.std()/x.iloc[0])
-        stock_df['1m_shift'] = stock_df.price.shift(1)
-        stock_df['dir'] = stock_df['1m_shift'].shift(-375).rolling(375).apply(lambda x: position(x))
-        return stock_df.dropna()[['3mo_return', '1mo_return', '1wk_return', '3d_return', '1d_return', '2hr_return', '10m_return', '2hr_vol', '10m_vol', 'dir']].reset_index(drop=True)
-    return filtered_single_stock_data
+    for shift in shifts:
+        for key, val in col_with_period.items():
+            gen_cols.append(f"{key}_{shift}")
+            stock_df.insert(
+                len(stock_df.columns),
+                f"{key}_{shift}",
+                stock_df.reset_index(drop=True).shift(shift).price.rolling(val).apply(get_slope).values
+            )
+
+    stock_df.insert(
+                len(stock_df.columns),
+                'dir',
+                stock_df.reset_index(drop=True).price.shift(-5).rolling(5).apply(lambda x: position(x)).values
+            )
+    gen_cols.append("dir")
+
+    return stock_df[gen_cols].dropna()
 
 
-def training_data(non_be_tickers: list, short: bool = False):
+def training_data(non_be_tickers: list):
     """
-    :param short:
-    :param non_be_tickers: this should contain the list of all non -BE stocks to start with
+    non_be_tickers: this should contain the list of all non -BE stocks to start with
     :return:
     """
 
-    # filter the stocks which are having both 6 month data as well 1 wk data
+    stocks_df = yf.download(tickers=non_be_tickers, interval='1d', period='6mo')
+    stocks_df.index = pd.to_datetime(stocks_df.index)
+    stocks_df = stocks_df.loc[:TRAINING_DATE]
+    stocks_df = stocks_df['Close'].bfill().ffill().dropna(axis=1)
 
-    monthly_stocks = yf.download(tickers=non_be_tickers, interval='1d', period='6mo')
-    monthly_stocks.index = pd.to_datetime(monthly_stocks.index)
-    monthly_stocks = monthly_stocks.loc[:TRAINING_DATE]
-    monthly_stocks = monthly_stocks['Close'].bfill().ffill().dropna(axis=1)
-
-    wk_stocks = yf.download(tickers=non_be_tickers, interval='1m', period='1wk')
-    wk_stocks.index = pd.to_datetime(wk_stocks.index, utc=True)
-    wk_stocks = wk_stocks.loc[:str(TRAINING_DATE.date())]
-    wk_stocks = wk_stocks['Close'].bfill().ffill().dropna(axis=1)
-
-    stocks_list = []
-    for a in list(monthly_stocks.columns):
-        for b in list(wk_stocks.columns):
-            if a == b:
-                stocks_list.append(a)
-    logger.info(wk_stocks[stocks_list])
+    stocks_list = list(stocks_df.columns)
 
     # generating the dataframe having both the input and output
-    filtered_single_stock_data = generate_data(monthly_stocks[stocks_list], wk_stocks[stocks_list], short)
+    # filtered_single_stock_data = generate_data(monthly_stocks[stocks_list])
 
     data_df = None
     for st in stocks_list:
+        stock_df = stocks_df[[st]]
+        stock_df.columns = ['price']
         if data_df is not None:
-            data_df = pd.concat([data_df, filtered_single_stock_data(st)]).reset_index(drop=True)
+            data_df = pd.concat([data_df, generate_data(stock_df)]).reset_index(drop=True)
         else:
-            data_df = filtered_single_stock_data(st)
+            data_df = generate_data(stock_df)
     return data_df
-
-
-
-
-
 

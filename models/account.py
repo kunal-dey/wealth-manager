@@ -60,7 +60,7 @@ class Account:
                 if not DEBUG:
                     self.holdings[holding_obj.stock.stock_name].position_price = holdings_from_api[holding_obj.stock.stock_name]
 
-    def buy_stocks(self):
+    def buy_stocks(self, day_based_df):
         """
         if it satisfies all the buying criteria then it buys the stock
         :return: None
@@ -80,38 +80,46 @@ class Account:
                     if zero_quantity:
                         continue
                 quantity, buy_price = self.stocks_to_track[stock_key].buy_parameters()
-                logger.info(f"parameters for {stock_key}: {quantity} {buy_price}")
-                buy_status = self.stocks_to_track[stock_key].whether_buy()
-                logger.info(f"to check whether the buy status is returned {buy_status}")
-                if buy_status:
-                    if long(
-                        symbol=self.stocks_to_track[stock_key].stock_name,
-                        quantity=int(quantity),
-                        product_type=ProductType.DELIVERY,
-                        exchange=self.stocks_to_track[stock_key].exchange
-                    ):
-                        logger.info(f"{self.stocks_to_track[stock_key].stock_name} has been bought @ {buy_price}.")
-                        self.stocks_to_track[stock_key].in_position = True  # now it will look for buy orders
-                        self.positions[stock_key] = Position(
-                            position_price=buy_price,
-                            stock=self.stocks_to_track[stock_key],
-                            position_type=PositionType.LONG,
-                            quantity=int(quantity),
-                            product_type=ProductType.DELIVERY
-                        )
-                        # if this is encountered first time then it will make it false else always make it false
-                        # earlier this was in stock info, but it has been moved since if there is an error in buying,
-                        # then it does not buy the stock and make it false. so if the stock is increasing then false will
-                        # never enter and there will be a loss
-                        self.stocks_to_track[stock_key].first_load = False
-                        self.stocks_to_track[stock_key].last_buy_price = buy_price
-                        self.stocks_to_track[stock_key].last_quantity = quantity
-                else:
+                if quantity == 0 or buy_price == 0:
                     logger.info("entered the first load logic to delete the file")
                     if self.stocks_to_track[stock_key].first_load:
                         self.available_cash += get_allocation()
                         stocks_to_delete.append(stock_key)
                         os.remove(os.getcwd() + f"/temp/{stock_key}.csv")
+                else:
+
+                    logger.info(f"parameters for {stock_key}: {quantity} {buy_price}")
+                    buy_status = self.stocks_to_track[stock_key].whether_buy(day_based_df)
+                    logger.info(f"to check whether the buy status is returned {buy_status}")
+                    if buy_status:
+                        if long(
+                            symbol=self.stocks_to_track[stock_key].stock_name,
+                            quantity=int(quantity),
+                            product_type=ProductType.DELIVERY,
+                            exchange=self.stocks_to_track[stock_key].exchange
+                        ):
+                            logger.info(f"{self.stocks_to_track[stock_key].stock_name} has been bought @ {buy_price}.")
+                            self.stocks_to_track[stock_key].in_position = True  # now it will look for buy orders
+                            self.positions[stock_key] = Position(
+                                position_price=buy_price,
+                                stock=self.stocks_to_track[stock_key],
+                                position_type=PositionType.LONG,
+                                quantity=int(quantity),
+                                product_type=ProductType.DELIVERY
+                            )
+                            # if this is encountered first time then it will make it false else always make it false
+                            # earlier this was in stock info, but it has been moved since if there is an error in buying,
+                            # then it does not buy the stock and make it false. so if the stock is increasing then false will
+                            # never enter and there will be a loss
+                            self.stocks_to_track[stock_key].first_load = False
+                            self.stocks_to_track[stock_key].last_buy_price = buy_price
+                            self.stocks_to_track[stock_key].last_quantity = quantity
+                    else:
+                        logger.info("entered the first load logic to delete the file")
+                        if self.stocks_to_track[stock_key].first_load:
+                            self.available_cash += get_allocation()
+                            stocks_to_delete.append(stock_key)
+                            os.remove(os.getcwd() + f"/temp/{stock_key}.csv")
 
         for stock_key in stocks_to_delete:
             del self.stocks_to_track[stock_key]

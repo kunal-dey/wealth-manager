@@ -86,11 +86,11 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
 
 def train_model(stock_list, short: bool = False):
     logger.info("data extraction")
-    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st], short)
+    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
 
-    logger.info(f"size: {data_df.shape}")
+    logger.info(f"size: {data_df}")
 
-    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df, short=short)
+    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df)
 
     def set_seeds(seed=100):
         random.seed(seed)
