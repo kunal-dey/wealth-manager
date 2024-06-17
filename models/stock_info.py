@@ -4,7 +4,6 @@ from logging import Logger
 from time import sleep
 from dataclasses import dataclass, field
 from typing import Callable
-import numpy as np
 
 import requests
 import pandas as pd
@@ -18,13 +17,6 @@ from models.db_models.object_models import get_save_to_db, get_delete_from_db, g
 from models.costs.delivery_trading_cost import DeliveryTransactionCost
 from models.costs.intraday_trading_cost import IntradayTransactionCost
 from utils.indicators.kaufman_indicator import kaufman_indicator
-from utils.indicators.candlestick.patterns.bearish_engulfing import BearishEngulfing
-from utils.indicators.candlestick.patterns.bearish_harami import BearishHarami
-from utils.indicators.candlestick.patterns.dark_cloud_cover import DarkCloudCover
-from utils.indicators.candlestick.patterns.doji import Doji
-from utils.indicators.candlestick.patterns.evening_star import EveningStar
-from utils.indicators.candlestick.patterns.piercing_pattern import PiercingPattern
-from utils.indicators.candlestick.patterns.shooting_star import ShootingStar
 from utils.indicators.candlestick.patterns.bullish_engulfing import BullishEngulfing
 from utils.indicators.candlestick.patterns.bullish_harami import BullishHarami
 from utils.indicators.candlestick.patterns.morning_star import MorningStar
@@ -132,10 +124,10 @@ class StockInfo:
         Returns:
 
         """
-        dtstart, until = self.created_at.date(), TODAY.date()
-        days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dtstart, until=until).count()
+        dt_start, until = self.created_at.date(), TODAY.date()
+        days = rrule(WEEKLY, byweekday=(MO, TU, WE, TH, FR), dtstart=dt_start, until=until).count()
         for day in load_holidays()['dates']:
-            if dtstart < day.date() < until:
+            if dt_start < day.date() < until:
                 days -= 1
         return days
 
@@ -261,12 +253,6 @@ class StockInfo:
         :return: True, if buy else false
         """
 
-        def get_slope(col):
-            index = list(col.index)
-            coefficient = np.polyfit(index, col.values, 1)
-            ini = coefficient[0] * index[0] + coefficient[1]
-            return coefficient[0] / ini
-
         logger.info(f"to check whether this function is entered or not")
         logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
 
@@ -310,8 +296,6 @@ class StockInfo:
             logger.info("found")
 
         if self.__result_stock_df.shape[0] > 15:
-            # if self.first_load:
-            # if self.stock_name in self.chosen_long_stocks and self.stock_name not in self.chosen_short_stocks:
 
             line_df = ohlc_data.copy()
             line_df = line_df[['Close']]
@@ -319,28 +303,7 @@ class StockInfo:
             line_df['line'] = line_df.apply(kaufman_indicator)
             line_df['ema'] = line_df.line.ewm(span=5, adjust=False).mean()
 
-            # logger.info(list(line_df['ema'] < line_df['ema'].shift(-1))[-1])
-            # logger.info(ohlc_data)
-
             if True in list(ohlc_data[matching_columns].iloc[-1]):
                 logger.info("entered on whether to buy the stock")
-                # stock_df = self.__result_stock_df.copy()
-                # line = stock_df.apply(kaufman_indicator)
-                # # rsi = self.__result_stock_df.apply(calculate_rsi
-                # transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-                # if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
-                #     if True in list(ohlc_data[matching_columns].iloc[-1]):
-                #         if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
                 return True
-        # else:
-        #     logger.info("entered on whether to buy the stock")
-        #     stock_df = self.__result_stock_df.copy()
-        #     line = stock_df.apply(kaufman_indicator)
-        #     # rsi = self.__result_stock_df.apply(calculate_rsi)
-        #
-        #     transformed = line.reset_index(drop=True).iloc[-30:].rolling(10).apply(get_slope)
-        #     if line.price.iloc[-10] < line.shift(4).price.iloc[-1]:
-        #         if True in list(ohlc_data[matching_columns].iloc[-1]):
-        #             if line.price.iloc[-1] > line.shift(1).price.iloc[-1]:
-        #                 return True
         return False

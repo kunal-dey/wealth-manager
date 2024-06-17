@@ -114,19 +114,28 @@ class Stage:
                 if earlier_trigger < self.trigger:
                     self.trigger = earlier_trigger
 
-        # if self.trigger:
-        #     logger.info(
-        #         f"current return for {self.stock.stock_name} is  {(self.trigger / (cost - (self.stock.wallet / self.quantity))) - 1}")
-
-    def sell(self):
+    def sell(self, force=False):
         # this has been done because if there is error while selling it still says it sold
         # suppose the stock is not even bought but still it tries to sell in that case it may fail
         buy_price = self.position_price
         selling_price = self.current_price
         tx_cost = self.stock.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
         wallet_value = (selling_price - (buy_price + tx_cost))*self.quantity
+        monthly_return = EXPECTED_MINIMUM_MONTHLY_RETURN if self.stock.number_of_days <= 16 else 0.04
 
-        if 1+(wallet_value/get_allocation()) > (1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(self.stock.number_of_days/20):
+        if force:
+            if short(
+                    symbol=self.stock.stock_name,
+                    quantity=self.quantity,
+                    product_type=self.product_type,
+                    exchange=self.stock.exchange):
+
+                logger.info(f"Selling {self.stock.stock_name} at {self.current_price} Quantity:{self.quantity}")
+                self.stock.wallet += wallet_value
+                logger.info(f"Wallet: {self.stock.wallet}")
+                return True
+
+        if 1+(wallet_value/get_allocation()) > (1+monthly_return)**(self.stock.number_of_days/20):
             if short(
                     symbol=self.stock.stock_name,
                     quantity=self.quantity,

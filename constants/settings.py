@@ -1,12 +1,12 @@
 from datetime import datetime
 
-DEBUG = True
+DEBUG = False
 
 # time settings
 __current_time = datetime.now()
 
-TODAY = datetime(2024, 5, 16) if DEBUG else datetime.now()
-TRAINING_DATE = datetime(2024, 5, 13) if DEBUG else datetime.now()
+TODAY = datetime(2024, 6, 11) if DEBUG else datetime.now()
+TRAINING_DATE = datetime(2024, 6, 11) if DEBUG else datetime.now()
 
 GENERATOR_URL = '127.0.0.1:8082'
 MIS_STOCK_LIST = "https://docs.google.com/spreadsheets/d/1fLTsNpFJPK349RTjs0GRSXJZD-5soCUkZt9eSMTJ2m4/export?format=csv"
@@ -19,7 +19,7 @@ if DEBUG:
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 23, 58, 0)
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
-    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 20, 0)
+    START_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 13, 30, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
     STOP_BUYING_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)

@@ -8,6 +8,9 @@ from datetime import datetime
 from time import sleep
 
 from constants.global_contexts import set_access_token
+from models.db_models.db_functions import retrieve_all_services
+from models.wallet import Wallet
+from routes.wallet_input import wallet_input
 
 from services.background_task import background_task
 from constants.global_contexts import kite_context
@@ -64,7 +67,7 @@ async def start_process():
     """
     try:
         # to test whether the access toke has been set after login
-        # _ = kite_context.ltp("NSE:INFY")
+        _ = kite_context.ltp("NSE:INFY")
 
         # starting the background task which will run the entire process
         app.add_background_task(background_task)
@@ -100,49 +103,15 @@ async def train():
     return {"message": "Training started"}
 
 
-@app.get("/test")
-async def cndl():
-    def get_ohlc(df, window=5):
-        data = df.copy()
-        data = data.iloc[-180:]
+# @app.get("/wallet")
+# async def add_elements():
+#     wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
+#
+#     print(wallets[0])
+#     return {"msg":"wallet"}
 
-        # Apply a rolling window of 15 minutes
-        rolling_data = data['price'].rolling(window=window)
 
-        # Calculate Open, Close, High, and Low prices for each window
-        open_price = rolling_data.apply(lambda x: x.iloc[0] if len(x) == window else None)
-        close_price = rolling_data.apply(lambda x: x.iloc[-1] if len(x) == window else None)
-        high_price = rolling_data.max()
-        low_price = rolling_data.min()
-
-        # Create a new DataFrame with these values
-        ohlcv_data = pd.DataFrame({
-            "Open": open_price,
-            "Close": close_price,
-            "High": high_price,
-            "Low": low_price
-        })
-
-        # Drop any rows with NaN values which occur at the start of the dataset
-        return ohlcv_data.dropna()
-    stock = pd.read_csv(f"temp/BFINVEST.csv")
-    # cndl = bearish_harami(get_ohlc(stock, 5))
-    data = get_ohlc(stock, 5)
-    cndl = BearishHarami(target='pattern0')
-
-    data =cndl.has_pattern(data, ['Open', 'High', 'Low', 'Close'], False)
-
-    candl = BearishEngulfing(target='pattern1')
-    ohlc_data = candl.has_pattern(data, ['Open', 'High', 'Low', 'Close'], False)
-
-    regex = re.compile('pattern', re.IGNORECASE)
-
-    # Filter columns where the column name matches the regex pattern
-    matching_columns = [col for col in ohlc_data.columns if regex.search(col)]
-    print(list(ohlc_data[matching_columns].iloc[-1]))
-    return {"msg": "no error"}
-
-resource_list: list[Blueprint] = [stocks_input]
+resource_list: list[Blueprint] = [stocks_input, wallet_input]
 
 for resource in resource_list:
     app.register_blueprint(blueprint=resource)

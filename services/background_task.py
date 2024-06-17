@@ -11,6 +11,8 @@ from models.account import Account
 from models.db_models.db_functions import retrieve_all_services, find_by_name
 from models.stages.position import Position
 from models.stock_info import StockInfo
+from models.wallet import Wallet
+from routes.stock_input import chosen_stocks, delete_stock_fn, set_delete_stock_to_none
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 
@@ -200,18 +202,22 @@ async def background_task():
                 predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
 
                 selected_long_stocks = [st[:-3] for st in predicted_stocks]
-                # selected_short_stocks = [st[:-3] for st in predict_short_stocks(prediction_df)]
 
                 logger.info(f"chosen long: {selected_long_stocks}")
-                # logger.info(f"chosen short: {selected_short_stocks}")
 
                 logger.info(f"available cash : {account.available_cash}")
 
                 logger.info(f"list of the stocks to track: {account.stocks_to_track.keys()}")
-                # logger.info(f"list of the short stocks to track: {account.short_stocks_to_track.keys()}")
-                # logger.info(f"short positions {account.short_positions}")
 
                 if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
+                    # adding the chosen stocks
+                    stocks_input = chosen_stocks()
+                    filtered_chosen_stocks = []
+                    for st in selected_long_stocks:
+                        if st not in stocks_input:
+                            filtered_chosen_stocks.append(st)
+                    selected_long_stocks.extend(filtered_chosen_stocks)
+
                     # selecting stock which meets the criteria
                     for stock_col in selected_long_stocks:
                         if stock_col not in blacklisted_stocks:
@@ -296,6 +302,21 @@ async def background_task():
                         case "CONTINUE":
                             continue
 
+                selected_stock_to_delete = delete_stock_fn()
+                logger.info(f"from routes {str(selected_stock_to_delete)}")
+                logger.info(account.positions.keys())
+                if selected_stock_to_delete in account.positions.keys() and selected_stock_to_delete not in positions_to_delete:
+                    positions_to_delete.append(selected_stock_to_delete)
+                    position: Position = account.positions[selected_stock_to_delete]
+                    logger.info(f" manually selling the position {position.stock.stock_name} at {position.stock.latest_price}")
+                    logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
+                    logger.info(f"breached stock wallet {selected_stock_to_delete} {account.stocks_to_track[selected_stock_to_delete].wallet}")
+                    if position.stock.number_of_days == 1:
+                        account.available_cash += get_allocation()
+                    os.remove(os.getcwd() + f"/temp/{selected_stock_to_delete}.csv")
+                    today_profit += float(account.stocks_to_track[selected_stock_to_delete].wallet)
+                    set_delete_stock_to_none()
+
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
                     del account.stocks_to_track[position_name]  # delete from stocks to track
@@ -347,21 +368,28 @@ async def background_task():
             del account.stocks_to_track[position_name]  # delete from stocks to track
             os.remove(os.getcwd() + f"/temp/{position_name}.csv")
 
-    # # to store all the stock with wallet value in ascending order
-    # wallet_order = {float(account.stocks_to_track[st].wallet): st for st in account.stocks_to_track.keys()}
-
     sorted_wallet_list = list(wallet_order.keys())
 
     positions_to_delete = []
 
-    for wallet_v in sorted(sorted_wallet_list, reverse=True):
+    wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
+    wallet_obj: Wallet = wallets[0]
+
+    logger.info(sorted(sorted_wallet_list))
+
+    for wallet_v in sorted(sorted_wallet_list):
         position_name = wallet_order[wallet_v]
         position: Position = account.positions[position_name]
-        if float(wallet_v) + today_profit > account.starting_cash*DAILY_MINIMUM_RETURN:
-            if position.sell():
-                logger.info(f" SOLD at the end -->sell {position.stock.stock_name} at {position.stock.latest_price}")
+        logger.info(wallet_obj.accumulated_amount - wallet_obj.expected_amount)
+        logger.info(wallet_v)
+
+        if abs(float(wallet_v)) < wallet_obj.accumulated_amount - wallet_obj.expected_amount and position.stock.number_of_days > 16:
+            if position.sell(force=True):
+                logger.info(f" sold as the stock was there for 16 days and accumulated amount is more {position.stock.stock_name} at {position.stock.latest_price}")
                 positions_to_delete.append(position_name)
-                logger.info(f"breached stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                logger.info(f"stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                wallet_obj.accumulated_amount -= account.stocks_to_track[position_name].wallet
+                logger.info(wallet_obj.accumulated_amount)
                 account.available_cash += get_allocation()
                 today_profit += float(account.stocks_to_track[position_name].wallet)
                 del account.stocks_to_track[position_name]  # delete from stocks to track
