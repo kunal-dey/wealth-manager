@@ -61,7 +61,7 @@ async def add_stock(stock):
         return {"message": "Kindly login first"}, 400
 
 
-@stocks_input.get("/delete_stock/<string:stock>")
+@stocks_input.get("/delete-stock/<string:stock>")
 async def delete_stock(stock):
     """
         this route is used to manually delete one stock at a time
@@ -92,7 +92,7 @@ async def delete_stock(stock):
     #     }, 400
 
 
-@stocks_input.get("/all_stocks")
+@stocks_input.get("/all-stocks")
 async def fetch_all_stocks():
     """
         returns the list of all stocks being tracked

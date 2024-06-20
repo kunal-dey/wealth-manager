@@ -56,9 +56,8 @@ async def wallet_info():
     """
     wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
     wallet: Wallet = wallets[0]
-    wallet_json:dict = jsonify(wallet)
-    del wallet_json["_id"]
+
     return {
         "message": "wallet info",
-        "data": wallet_json
+        "data": wallet.metrics()
     }

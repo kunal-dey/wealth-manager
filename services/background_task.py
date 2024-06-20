@@ -306,16 +306,17 @@ async def background_task():
                 logger.info(f"from routes {str(selected_stock_to_delete)}")
                 logger.info(account.positions.keys())
                 if selected_stock_to_delete in account.positions.keys() and selected_stock_to_delete not in positions_to_delete:
-                    positions_to_delete.append(selected_stock_to_delete)
                     position: Position = account.positions[selected_stock_to_delete]
-                    logger.info(f" manually selling the position {position.stock.stock_name} at {position.stock.latest_price}")
-                    logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
-                    logger.info(f"breached stock wallet {selected_stock_to_delete} {account.stocks_to_track[selected_stock_to_delete].wallet}")
-                    if position.stock.number_of_days == 1:
-                        account.available_cash += get_allocation()
-                    os.remove(os.getcwd() + f"/temp/{selected_stock_to_delete}.csv")
-                    today_profit += float(account.stocks_to_track[selected_stock_to_delete].wallet)
-                    set_delete_stock_to_none()
+                    if position.sell():
+                        positions_to_delete.append(selected_stock_to_delete)
+                        logger.info(f" manually selling the position {position.stock.stock_name} at {position.stock.latest_price}")
+                        logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
+                        logger.info(f"breached stock wallet {selected_stock_to_delete} {account.stocks_to_track[selected_stock_to_delete].wallet}")
+                        if position.stock.number_of_days == 1:
+                            account.available_cash += get_allocation()
+                        os.remove(os.getcwd() + f"/temp/{selected_stock_to_delete}.csv")
+                        today_profit += float(account.stocks_to_track[selected_stock_to_delete].wallet)
+                        set_delete_stock_to_none()
 
                 for position_name in positions_to_delete:
                     del account.positions[position_name]
@@ -383,16 +384,19 @@ async def background_task():
         logger.info(wallet_obj.accumulated_amount - wallet_obj.expected_amount)
         logger.info(wallet_v)
 
-        if abs(float(wallet_v)) < wallet_obj.accumulated_amount - wallet_obj.expected_amount and position.stock.number_of_days > 16:
-            if position.sell(force=True):
-                logger.info(f" sold as the stock was there for 16 days and accumulated amount is more {position.stock.stock_name} at {position.stock.latest_price}")
-                positions_to_delete.append(position_name)
-                logger.info(f"stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
-                wallet_obj.accumulated_amount -= account.stocks_to_track[position_name].wallet
-                logger.info(wallet_obj.accumulated_amount)
-                account.available_cash += get_allocation()
-                today_profit += float(account.stocks_to_track[position_name].wallet)
-                del account.stocks_to_track[position_name]  # delete from stocks to track
+        try:
+            if abs(float(wallet_v)) < wallet_obj.accumulated_amount - wallet_obj.expected_amount and position.stock.number_of_days > 16:
+                if position.sell(force=True):
+                    logger.info(f" sold as the stock was there for 16 days and accumulated amount is more {position.stock.stock_name} at {position.stock.latest_price}")
+                    positions_to_delete.append(position_name)
+                    logger.info(f"stock wallet {position_name} {account.stocks_to_track[position_name].wallet}")
+                    wallet_obj.accumulated_amount -= account.stocks_to_track[position_name].wallet
+                    logger.info(wallet_obj.accumulated_amount)
+                    account.available_cash += get_allocation()
+                    today_profit += float(account.stocks_to_track[position_name].wallet)
+                    del account.stocks_to_track[position_name]  # delete from stocks to track
+        except:
+            logger.exception("failed in wallet check")
 
     for position_name in positions_to_delete:
         del account.positions[position_name]

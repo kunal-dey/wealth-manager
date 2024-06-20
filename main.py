@@ -103,12 +103,14 @@ async def train():
     return {"message": "Training started"}
 
 
-# @app.get("/wallet")
-# async def add_elements():
-#     wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
-#
-#     print(wallets[0])
-#     return {"msg":"wallet"}
+@app.get("/create-wallet")
+async def add_elements():
+    # wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
+    #
+    # print(wallets[0])
+    wallet: Wallet = Wallet()
+    await wallet.create_wallet()
+    return {"msg":"wallet"}
 
 
 resource_list: list[Blueprint] = [stocks_input, wallet_input]
