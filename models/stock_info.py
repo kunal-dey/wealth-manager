@@ -9,6 +9,8 @@ import requests
 import pandas as pd
 from bson import ObjectId
 from dateutil.rrule import rrule, WEEKLY, MO, TU, WE, TH, FR
+
+from constants.enums.shift import Shift
 from utils.exclude_dates import load_holidays
 
 from constants.global_contexts import kite_context
@@ -22,6 +24,10 @@ from utils.indicators.candlestick.patterns.bullish_harami import BullishHarami
 from utils.indicators.candlestick.patterns.morning_star import MorningStar
 from utils.indicators.candlestick.patterns.hammer import Hammer
 from utils.indicators.candlestick.patterns.inverted_hammer import InvertedHammer
+
+from utils.indicators.candlestick.patterns.bearish_engulfing import BearishEngulfing
+from utils.indicators.candlestick.patterns.bearish_harami import BearishHarami
+from utils.indicators.candlestick.patterns.evening_star import EveningStar
 
 from utils.logger import get_logger
 from constants.settings import GENERATOR_URL, MAXIMUM_ALLOCATION
@@ -219,32 +225,57 @@ class StockInfo:
         self.__result_stock_df = self.__result_stock_df.bfill().ffill()
         self.__result_stock_df.dropna(axis=1, inplace=True)
 
-    def get_ohlc(self):
+    def get_ohlc(self, shift: Shift):
         data = self.__result_stock_df.copy()
         # since a check is needed to verify whether the trend actually reversed or not
-        window = len(data)
+        window = 0
+        if shift == Shift.MORNING:
+            window = 5
+        elif shift == Shift.EVENING:
+            window = len(data)
 
-        # Apply a rolling window of 15 minutes
-        rolling_data = data['price'].rolling(window=window)
+        ohlcv_data = pd.DataFrame()
 
-        # Calculate Open, Close, High, and Low prices for each window
-        open_price = rolling_data.apply(lambda x: x.iloc[0] if len(x) == window else None)
-        close_price = rolling_data.apply(lambda x: x.iloc[-1] if len(x) == window else None)
-        high_price = rolling_data.max()
-        low_price = rolling_data.min()
+        if shift == Shift.MORNING:
+            # Apply a rolling window of 15 minutes
+            rolling_data = data['price'].rolling(window=window)
+            # Calculate Open, Close, High, and Low prices for each window
+            open_price = rolling_data.apply(lambda x: x.iloc[0] if len(x) == window else None)
+            close_price = rolling_data.apply(lambda x: x.iloc[-1] if len(x) == window else None)
+            high_price = rolling_data.max()
+            low_price = rolling_data.min()
 
-        # Create a new DataFrame with these values
-        ohlcv_data = pd.DataFrame({
-            "Open": open_price,
-            "Close": close_price,
-            "High": high_price,
-            "Low": low_price
-        })
+            # Create a new DataFrame with these values
+            ohlcv_data = pd.DataFrame({
+                "Open": open_price,
+                "Close": close_price,
+                "High": high_price,
+                "Low": low_price
+            })
+            # logger.info(f"ohlc_data: {ohlcv_data}")
+
+        if shift == Shift.EVENING:
+
+            rolling_data = data['price'].rolling(window=window)
+
+            # Calculate Open, Close, High, and Low prices for each window
+            open_price = rolling_data.apply(lambda x: x.iloc[0] if len(x) == window else None)
+            close_price = rolling_data.apply(lambda x: x.iloc[-1] if len(x) == window else None)
+            high_price = rolling_data.max()
+            low_price = rolling_data.min()
+
+            # Create a new DataFrame with these values
+            ohlcv_data = pd.DataFrame({
+                "Open": open_price,
+                "Close": close_price,
+                "High": high_price,
+                "Low": low_price
+            })
 
         # Drop any rows with NaN values which occur at the start of the dataset
         return ohlcv_data.dropna()
 
-    def whether_buy(self, day_based_df) -> bool:
+    def whether_buy(self, day_based_df, shift: Shift) -> bool:
         """
         Buy the stock if certain conditions are met:
         1. If total buying quantity/ total selling quantity > 0.8 then buy
@@ -268,42 +299,63 @@ class StockInfo:
         d = day_based_df[columns_for_level2]
         d.columns = [col[0] for col in columns_for_level2]
 
-        ohlc_data = self.get_ohlc()
+        ohlc_data = self.get_ohlc(shift)
 
         ohlc_data = pd.concat([d, ohlc_data.iloc[-1:]], ignore_index=True)
 
+        ohlc_data_yes = ohlc_data.copy()
+        ohlc_data_no = ohlc_data.copy()
+
+        # if shift == Shift.EVENING:
         candl = BullishEngulfing(target='pattern0')
-        ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
+        ohlc_data_yes = candl.has_pattern(ohlc_data_yes, default_ohlc, False)
 
         candl = BullishHarami(target='pattern1')
-        ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
+        ohlc_data_yes = candl.has_pattern(ohlc_data_yes, default_ohlc, False)
 
         candl = MorningStar(target='pattern2')
-        ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
+        ohlc_data_yes = candl.has_pattern(ohlc_data_yes, default_ohlc, False)
 
         candl = Hammer(target='pattern4')
-        ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
+        ohlc_data_yes = candl.has_pattern(ohlc_data_yes, default_ohlc, False)
 
         candl = InvertedHammer(target='pattern5')
-        ohlc_data = candl.has_pattern(ohlc_data, default_ohlc, False)
+        ohlc_data_yes = candl.has_pattern(ohlc_data_yes, default_ohlc, False)
+        # if shift == Shift.MORNING:
+        candl = BearishEngulfing(target='pattern0')
+        ohlc_data_no = candl.has_pattern(ohlc_data_no, default_ohlc, False)
+
+        candl = BearishHarami(target='pattern1')
+        ohlc_data_no = candl.has_pattern(ohlc_data_no, default_ohlc, False)
+
+        candl = EveningStar(target='pattern2')
+        ohlc_data_no = candl.has_pattern(ohlc_data_no, default_ohlc, False)
 
         regex = re.compile('pattern', re.IGNORECASE)
 
         # Filter columns where the column name matches the regex pattern
-        matching_columns = [col for col in ohlc_data.columns if regex.search(col)]
+        matching_columns_yes = [col for col in ohlc_data_yes.columns if regex.search(col)]
+        matching_columns_no = [col for col in ohlc_data_no.columns if regex.search(col)]
 
-        if True in list(ohlc_data[matching_columns].iloc[-1]):
-            logger.info("found")
+        # if True in list(ohlc_data[matching_columns].iloc[-1]):
+        #     logger.info("found")
 
         if self.__result_stock_df.shape[0] > 15:
 
-            line_df = ohlc_data.copy()
-            line_df = line_df[['Close']]
+            line_df = self.__result_stock_df.copy()
+            # line_df = line_df[['Close']]
             line_df.columns = ['price']
             line_df['line'] = line_df.apply(kaufman_indicator)
             line_df['ema'] = line_df.line.ewm(span=5, adjust=False).mean()
 
-            if True in list(ohlc_data[matching_columns].iloc[-1]):
-                logger.info("entered on whether to buy the stock")
-                return True
+            if shift == Shift.EVENING:
+                if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
+                    logger.info("entered on whether to buy the stock in evening")
+                    if line_df['ema'].iloc[-3] < line_df['ema'].iloc[-6]:
+                        return True
+            if shift == Shift.MORNING:
+                if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
+                    logger.info("entered on whether to buy the stock in morning")
+                    if line_df['ema'].iloc[-1] > line_df['ema'].iloc[-3] > line_df['ema'].iloc[-5]:
+                        return True
         return False

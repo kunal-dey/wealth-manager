@@ -15,9 +15,10 @@ from models.wallet import Wallet
 from routes.stock_input import chosen_stocks, delete_stock_fn, set_delete_stock_to_none
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
+from constants.enums.shift import Shift
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
-    set_max_stocks, DEBUG, set_end_process, DAILY_MINIMUM_RETURN, START_BUYING_TIME, STOP_BUYING_TIME, TRAINING_DATE, \
+    set_max_stocks, DEBUG, set_end_process, START_BUYING_TIME_MORNING, STOP_BUYING_TIME_MORNING,START_BUYING_TIME_EVENING, STOP_BUYING_TIME_EVENING, TRAINING_DATE, \
     EXPECTED_MINIMUM_MONTHLY_RETURN
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
@@ -36,9 +37,12 @@ async def background_task():
     account: Account = Account()
 
     # prediction_df columns contains .NS whereas obtained_stock_list has all stocks which can be traded and are in mis
-    prediction_df, obtained_stock_list = None, await get_correct_symbol()
+    prediction_df, obtained_stock_list = None, await get_correct_symbol(higher_price=5000)
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
     obtained_stock_list.remove("M&MFIN")
+    obtained_stock_list.remove("M&M")
+    obtained_stock_list.remove('GMRP&UI')
+    obtained_stock_list.remove('J&KBANK')
     logger.info(f"non BE stock list : {obtained_stock_list}")
 
     not_loaded = True
@@ -67,7 +71,7 @@ async def background_task():
     # loading day based price df from yahoo finance
     day_based_price_df = None
     try:
-        day_based_price_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='6mo', interval='1d')[['Close', 'High', 'Low', 'Open']]
+        day_based_price_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1y', interval='1d')[['Close', 'High', 'Low', 'Open']]
         day_based_price_df = day_based_price_df.ffill().bfill()
         day_based_price_df.index = pd.to_datetime(day_based_price_df.index)
         day_based_price_df = day_based_price_df.loc[:str(TRAINING_DATE.date())]
@@ -139,17 +143,30 @@ async def background_task():
         model and parameter setup
     """
 
-    # model to predict long stocks
+    # model to predict morning stocks
 
-    model = load_model(os.getcwd() + "/temp/DNN_model")
+    model_morning = load_model(os.getcwd() + "/temp/DNN_model_morning")
 
-    logger.info(f"model loaded for long: {model}")
+    logger.info(f"model loaded for long: {model_morning}")
 
-    params = pickle.load(open(os.getcwd() + "/temp/params.pkl", "rb"))
+    params_morning = pickle.load(open(os.getcwd() + "/temp/params_morning.pkl", "rb"))
 
-    logger.info(f"mu and sigma loaded for long: {params}")
+    logger.info(f"mu and sigma loaded for long: {params_morning}")
 
-    predict_stocks = predict_running_df(day_based_price_df['Close'], model, params)
+    # model to predict evening stocks
+
+    model_evening = load_model(os.getcwd() + "/temp/DNN_model_evening")
+
+    logger.info(f"model loaded for long: {model_evening}")
+
+    params_evening = pickle.load(open(os.getcwd() + "/temp/params_evening.pkl", "rb"))
+
+    logger.info(f"mu and sigma loaded for long: {params_evening}")
+
+    # predict_stocks = predict_running_df(day_based_price_df['Close'], model, params)
+
+    predict_stocks_morning = predict_running_df(day_based_price_df['Open'], model_morning, params_morning)
+    predict_stocks_evening = predict_running_df(day_based_price_df['Close'], params_evening, params_evening)
 
     # this part will loop till the trading times end
     current_time = datetime.now()
@@ -198,7 +215,11 @@ async def background_task():
                 data_resampled = prediction_df.iloc[::60, :]
                 log_returns = data_resampled.pct_change()
                 VaR_95 = log_returns.quantile(0.005, interpolation='lower')
-                stock_list = predict_stocks(prediction_df)
+
+                if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
+                    stock_list = predict_stocks_morning(prediction_df, Shift.MORNING)
+                # elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
+                #     stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
                 predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
 
                 selected_long_stocks = [st[:-3] for st in predicted_stocks]
@@ -209,7 +230,7 @@ async def background_task():
 
                 logger.info(f"list of the stocks to track: {account.stocks_to_track.keys()}")
 
-                if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
+                if (STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING) or (STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING):
                     # adding the chosen stocks
                     stocks_input = chosen_stocks()
                     filtered_chosen_stocks = []
@@ -258,9 +279,15 @@ async def background_task():
                     logger.info(f"stock to update {stock}")
                     account.stocks_to_track[stock].update_price()
 
-                if STOP_BUYING_TIME > current_time > START_BUYING_TIME:
+                if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
                     try:
-                        account.buy_stocks(day_based_price_df)
+                        account.buy_stocks(day_based_price_df, shift=Shift.MORNING)
+                    except:
+                        pass
+
+                elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
+                    try:
+                        account.buy_stocks(day_based_price_df, shift=Shift.EVENING)
                     except:
                         pass
 
@@ -284,19 +311,15 @@ async def background_task():
                                 account.available_cash += get_allocation()
                             os.remove(os.getcwd() + f"/temp/{position_name}.csv")
                             today_profit += float(account.stocks_to_track[position_name].wallet)
-                            # else:
-                            #     account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
 
                         case "SELL_LOSS":
                             logger.info(f" loss -->sell {position.stock.stock_name} at {position.stock.latest_price}")
-                            # account.short_stocks_to_track[position_name] = account.stocks_to_track[position_name]
                             positions_to_delete.append(position_name)
                             os.remove(os.getcwd() + f"/temp/{position_name}.csv")
                             if position.stock.number_of_days == 1:
                                 account.available_cash += get_allocation()
                             today_profit += float(account.stocks_to_track[position_name].wallet)
-                            # blacklisted_stocks.append(position_name)
                             logger.info(f"blacklisted stocks: {blacklisted_stocks}")
 
                         case "CONTINUE":

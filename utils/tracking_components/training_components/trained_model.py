@@ -13,6 +13,7 @@ from keras.layers import Dense, Dropout, Input
 from keras.optimizers import Adam
 from keras.models import Sequential
 
+from constants.enums.shift import Shift
 from utils.logger import get_logger
 from utils.tracking_components.training_components.data_preparation import training_data
 
@@ -33,13 +34,14 @@ class MonitorCallback(Callback):
         monitor_usage()
 
 
-def split_data(split_ratio: float, data_df: pd.DataFrame, short: bool = False):
+def split_data(split_ratio: float, data_df: pd.DataFrame, shift: Shift):
     """
     for testing the split ratio can be 0.8 or 0.7 but for regular reading it should be 1
-    :param short:
     :param split_ratio: ratio of train/test data count
     :param data_df: dataframe to split
+    :param shift: shift
     :return:
+
     """
     split_index = int(len(data_df) * split_ratio)
     train = data_df.iloc[:split_index].copy()
@@ -53,10 +55,11 @@ def split_data(split_ratio: float, data_df: pd.DataFrame, short: bool = False):
     logger.info(f"training data count : {train.shape}")
 
     params = (mu, sigma)
-    if short:
-        pickle.dump(params, open(getcwd() + "/temp/params_short.pkl", "wb"))
-    else:
-        pickle.dump(params, open(getcwd() + "/temp/params.pkl", "wb"))
+
+    if shift == Shift.MORNING:
+        pickle.dump(params, open(getcwd() + "/temp/params_morning.pkl", "wb"))
+    elif shift == Shift.EVENING:
+        pickle.dump(params, open(getcwd() + "/temp/params_evening.pkl", "wb"))
 
     logger.info(f"parameter saved")
     return train, train_s, test, test_s
@@ -84,13 +87,13 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
     return model
 
 
-def train_model(stock_list, short: bool = False):
-    logger.info("data extraction")
-    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st])
+def train_model(stock_list, shift: Shift):
+    logger.info(f"data extraction for {shift.value}")
+    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st], shift)
 
     logger.info(f"size: {data_df}")
 
-    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df)
+    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df, shift=shift)
 
     def set_seeds(seed=100):
         random.seed(seed)
@@ -104,7 +107,6 @@ def train_model(stock_list, short: bool = False):
 
     set_seeds(100)
 
-    # train, train_s, test, test_s = split_data(split_ratio=split_ratio, data_df=data_df)
     features = list(train_s.columns[train_s.columns != 'dir'])
 
     model = create_model(hl=2, dropout=True, input_dim=len(features))
@@ -121,10 +123,10 @@ def train_model(stock_list, short: bool = False):
     _, accuracy = model.evaluate(train_s[features], train['dir'])
     logger.info(f"accuracy obtained -> {accuracy}")
 
-    if short:
-        model.save(getcwd() + "/temp/DNN_model_short")
-    else:
-        model.save(getcwd() + "/temp/DNN_model")
+    if shift == Shift.MORNING:
+        model.save(getcwd() + "/temp/DNN_model_morning")
+    elif shift == Shift.EVENING:
+        model.save(getcwd() + "/temp/DNN_model_evening")
 
     logger.info(f"model saved: {model}")
 

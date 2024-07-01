@@ -3,6 +3,7 @@ from logging import Logger
 import yfinance as yf
 import pandas as pd
 
+from constants.enums.shift import Shift
 from constants.settings import TRAINING_DATE
 import numpy as np
 from utils.logger import get_logger
@@ -28,16 +29,17 @@ def generate_data(stock_df):
         :return:
         """
         returns = (x.pct_change()+1).cumprod()
-        return 0 if returns[returns > 1.01].shape[0] == 0 else 1
+        return 0 if returns[returns > 1.08].shape[0] == 0 else 1
 
     col_with_period = {
+        '6mo': 132,
         '3mo': 66,
         '1mo': 22,
         '1wk': 5,
-        '3d': 3
+        '2d': 2
     }
 
-    shifts = [sh for sh in range(5)]
+    shifts = [sh for sh in range(3)]
     gen_cols = []
 
     for shift in shifts:
@@ -52,28 +54,30 @@ def generate_data(stock_df):
     stock_df.insert(
                 len(stock_df.columns),
                 'dir',
-                stock_df.reset_index(drop=True).price.shift(-5).rolling(5).apply(lambda x: position(x)).values
+                stock_df.reset_index(drop=True).price.shift(-15).rolling(15).apply(lambda x: position(x)).values
             )
     gen_cols.append("dir")
 
     return stock_df[gen_cols].dropna()
 
 
-def training_data(non_be_tickers: list):
+def training_data(non_be_tickers: list, shift: Shift):
     """
     non_be_tickers: this should contain the list of all non -BE stocks to start with
     :return:
     """
 
-    stocks_df = yf.download(tickers=non_be_tickers, interval='1d', period='6mo')
+    stocks_df = yf.download(tickers=non_be_tickers, interval='1d', period='1y')
     stocks_df.index = pd.to_datetime(stocks_df.index)
     stocks_df = stocks_df.loc[:TRAINING_DATE]
-    stocks_df = stocks_df['Close'].bfill().ffill().dropna(axis=1)
+    if shift == Shift.MORNING:
+        stocks_df = stocks_df['Open'].bfill().ffill().dropna(axis=1)
+    elif shift == Shift.EVENING:
+        stocks_df = stocks_df['Close'].bfill().ffill().dropna(axis=1)
 
     stocks_list = list(stocks_df.columns)
 
     # generating the dataframe having both the input and output
-    # filtered_single_stock_data = generate_data(monthly_stocks[stocks_list])
 
     data_df = None
     for st in stocks_list:

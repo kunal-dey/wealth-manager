@@ -2,6 +2,7 @@ from logging import Logger
 import numpy as np
 import pandas as pd
 
+from constants.enums.shift import Shift
 from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
 
@@ -20,41 +21,27 @@ def predict_running_df(day_based_data, model, params):
     mu = mu.iloc[:-1]
     sigma = sigma.iloc[:-1]
 
-    def predict_stocks(min_based_data):
+    def predict_stocks(min_based_data, shift: Shift):
 
-        stocks_df = pd.concat([day_based_data.iloc[:-1], min_based_data.iloc[-2:-1]], ignore_index=True)
+        stocks_df = None
 
-        # running_df = pd.concat([
-        #     three_month,
-        #     one_month,
-        #     one_week,
-        #     three_days,
-        #     min_based_data.reset_index(drop=True).iloc[-375:].apply(get_slope),
-        #     min_based_data.reset_index(drop=True).iloc[-120:].apply(get_slope),
-        #     min_based_data.reset_index(drop=True).iloc[-10:].apply(get_slope),
-        #     min_based_data.iloc[-120:].std() / min_based_data.iloc[-120],
-        #     min_based_data.iloc[-10:].std() / min_based_data.iloc[-10]
-        # ], axis=1)
-        # running_df.columns = [
-        #     '3mo_return',
-        #     '1mo_return',
-        #     '1wk_return',
-        #     '3d_return',
-        #     '1d_return',
-        #     '2hr_return',
-        #     '10m_return',
-        #     '2hr_vol',
-        #     '10m_vol'
-        # ]
+        if shift == Shift.MORNING:
+            stocks_df = pd.concat([day_based_data, min_based_data.iloc[0:1]], ignore_index=True)
+        elif shift == Shift.EVENING:
+            stocks_df = pd.concat([day_based_data, min_based_data.iloc[-2:-1]], ignore_index=True)
+
+        if stocks_df is None:
+            return []
 
         col_with_period = {
+                '6mo': 132,
                 '3mo': 66,
                 '1mo': 22,
                 '1wk': 5,
-                '3d': 3
+                '2d': 2
             }
 
-        shifts = [sh for sh in range(5)]
+        shifts = [sh for sh in range(3)]
         gen_cols = []
 
         concat_lst = []

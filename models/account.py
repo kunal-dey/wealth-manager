@@ -5,6 +5,7 @@ from datetime import datetime
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
+from constants.enums.shift import Shift
 from constants.settings import DEBUG, STARTING_CASH, get_allocation
 from constants.global_contexts import kite_context
 from models.db_models.db_functions import retrieve_all_services, jsonify, find_by_name
@@ -60,7 +61,7 @@ class Account:
                 if not DEBUG:
                     self.holdings[holding_obj.stock.stock_name].position_price = holdings_from_api[holding_obj.stock.stock_name]
 
-    def buy_stocks(self, day_based_df):
+    def buy_stocks(self, day_based_df, shift: Shift):
         """
         if it satisfies all the buying criteria then it buys the stock
         :return: None
@@ -89,7 +90,7 @@ class Account:
                 else:
 
                     logger.info(f"parameters for {stock_key}: {quantity} {buy_price}")
-                    buy_status = self.stocks_to_track[stock_key].whether_buy(day_based_df)
+                    buy_status = self.stocks_to_track[stock_key].whether_buy(day_based_df, shift)
                     logger.info(f"to check whether the buy status is returned {buy_status}")
                     if buy_status:
                         if long(

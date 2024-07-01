@@ -1,27 +1,21 @@
-import re
 from logging import Logger
 
 from quart import Quart, request, Blueprint
 from quart_cors import cors
 from kiteconnect.exceptions import InputException
 from datetime import datetime
-from time import sleep
 
+from constants.enums.shift import Shift
 from constants.global_contexts import set_access_token
-from models.db_models.db_functions import retrieve_all_services
 from models.wallet import Wallet
 from routes.wallet_input import wallet_input
 
 from services.background_task import background_task
 from constants.global_contexts import kite_context
-from utils.indicators.candlestick.patterns.bearish_engulfing import BearishEngulfing
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
 from utils.tracking_components.training_components.trained_model import train_model
 from utils.tracking_components.verify_symbols import get_correct_symbol
-
-import pandas as pd
-from utils.indicators.candlestick.patterns.bearish_harami import BearishHarami
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -91,12 +85,13 @@ async def stop_background_tasks():
 
 @app.get("/train")
 async def train():
-    obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=800)
+    obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=5000)
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 
     def training():
-        train_model(obtained_stock_list)
+        train_model(obtained_stock_list, shift=Shift.MORNING)
+        train_model(obtained_stock_list, shift=Shift.EVENING)
 
     # starting the training process
     app.add_background_task(training)
@@ -105,12 +100,9 @@ async def train():
 
 @app.get("/create-wallet")
 async def add_elements():
-    # wallets = await retrieve_all_services(Wallet.COLLECTION, Wallet)
-    #
-    # print(wallets[0])
     wallet: Wallet = Wallet()
     await wallet.create_wallet()
-    return {"msg":"wallet"}
+    return {"msg": "wallet"}
 
 
 resource_list: list[Blueprint] = [stocks_input, wallet_input]
