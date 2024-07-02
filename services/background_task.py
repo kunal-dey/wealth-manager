@@ -215,11 +215,12 @@ async def background_task():
                 data_resampled = prediction_df.iloc[::60, :]
                 log_returns = data_resampled.pct_change()
                 VaR_95 = log_returns.quantile(0.005, interpolation='lower')
+                stock_list = []
 
                 if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
                     stock_list = predict_stocks_morning(prediction_df, Shift.MORNING)
-                # elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
-                #     stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
+                elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
+                    stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
                 predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
 
                 selected_long_stocks = [st[:-3] for st in predicted_stocks]
@@ -330,7 +331,7 @@ async def background_task():
                 logger.info(account.positions.keys())
                 if selected_stock_to_delete in account.positions.keys() and selected_stock_to_delete not in positions_to_delete:
                     position: Position = account.positions[selected_stock_to_delete]
-                    if position.sell():
+                    if position.sell(force=True):
                         positions_to_delete.append(selected_stock_to_delete)
                         logger.info(f" manually selling the position {position.stock.stock_name} at {position.stock.latest_price}")
                         logger.info(f"{position.stock.wallet/get_allocation()}, {(1+EXPECTED_MINIMUM_MONTHLY_RETURN)**(position.stock.number_of_days/20)}")
