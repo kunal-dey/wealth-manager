@@ -166,7 +166,7 @@ async def background_task():
     # predict_stocks = predict_running_df(day_based_price_df['Close'], model, params)
 
     predict_stocks_morning = predict_running_df(day_based_price_df['Open'], model_morning, params_morning)
-    predict_stocks_evening = predict_running_df(day_based_price_df['Close'], params_evening, params_evening)
+    predict_stocks_evening = predict_running_df(day_based_price_df['Close'], model_evening, params_evening)
 
     # this part will loop till the trading times end
     current_time = datetime.now()
