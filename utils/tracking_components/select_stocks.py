@@ -61,14 +61,18 @@ def predict_running_df(day_based_data, model, params):
         selected = []
         predictions = list(running_df[running_df['position'] == 1].index)
 
-        filtered_df = min_based_data[predictions]
-        line = filtered_df.apply(kaufman_indicator)
-        transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
-        filters = (transformed < transformed.shift(1)) & (transformed.shift(1) < transformed.shift(2)) & (transformed < 0)
+        try:
+            filtered_df = min_based_data[predictions]
+            line = filtered_df.apply(kaufman_indicator)
+            transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
+            logger.info(transformed)
+            filters = (transformed < transformed.shift(1)) & (transformed.shift(1) < transformed.shift(2)) & (transformed < 0)
 
-        for st in list(transformed.iloc[-1][filters.iloc[-1]].index):
-            if st in predictions:
-                selected.append(st)
+            for st in list(transformed.iloc[-1][filters.iloc[-1]].index):
+                if st in predictions:
+                    selected.append(st)
+        except:
+            logger.exception("error in transformed")
 
         return predictions
 

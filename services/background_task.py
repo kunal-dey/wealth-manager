@@ -39,10 +39,6 @@ async def background_task():
     # prediction_df columns contains .NS whereas obtained_stock_list has all stocks which can be traded and are in mis
     prediction_df, obtained_stock_list = None, await get_correct_symbol(higher_price=5000)
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
-    obtained_stock_list.remove("M&MFIN")
-    obtained_stock_list.remove("M&M")
-    obtained_stock_list.remove('GMRP&UI')
-    obtained_stock_list.remove('J&KBANK')
     logger.info(f"non BE stock list : {obtained_stock_list}")
 
     not_loaded = True
