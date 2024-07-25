@@ -46,7 +46,7 @@ EXPECTED_MINIMUM_MONTHLY_RETURN = 0.1  # minimum monthly_return which is expecte
 
 # total investment
 MAXIMUM_STOCKS = 10
-MAXIMUM_ALLOCATION = 10000
+MAXIMUM_ALLOCATION = 12000
 
 END_PROCESS = False
 

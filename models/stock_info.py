@@ -285,11 +285,11 @@ class StockInfo:
         """
 
         logger.info(f"to check whether this function is entered or not")
-        logger.info(f"stock df size {self.__result_stock_df.shape[0]}")
+        logger.info(f"stock df size {self.__result_stock_df}")
 
         multiindex_columns = day_based_df.columns
 
-        if self.__result_stock_df is None and self.__result_stock_df.shape[0] < 15:
+        if self.__result_stock_df is None or self.__result_stock_df.shape[0] < 15:
             return False
 
         default_ohlc = ['Open', 'High', 'Low', 'Close']

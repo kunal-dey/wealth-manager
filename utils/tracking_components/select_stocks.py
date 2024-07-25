@@ -29,6 +29,7 @@ def predict_running_df(day_based_data, model, params):
             stocks_df = pd.concat([day_based_data, min_based_data.iloc[0:1]], ignore_index=True)
         elif shift == Shift.EVENING:
             stocks_df = pd.concat([day_based_data, min_based_data.iloc[-2:-1]], ignore_index=True)
+        logger.info(stocks_df)
 
         if stocks_df is None:
             return []
@@ -54,9 +55,11 @@ def predict_running_df(day_based_data, model, params):
         running_df.columns = gen_cols
 
         running_df.dropna(inplace=True)
+        logger.info(running_df)
         running_df_s = (running_df-mu)/sigma
         running_df['prob'] = model.predict(running_df_s)
-        running_df['position'] = np.where(running_df['prob'] > 0.8, 1, 0)
+        running_df['position'] = np.where(running_df['prob'] > 0.7, 1, 0)
+        logger.info(running_df)
 
         selected = []
         predictions = list(running_df[running_df['position'] == 1].index)
