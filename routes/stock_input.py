@@ -79,17 +79,6 @@ async def delete_stock(stock):
 
     except kiteconnect.exceptions.InputException:
         return {"message": "Kindly login first"}, 400
-    # global selected_stocks
-    # if stock in selected_stocks:
-    #     selected_stocks.remove(stock)
-    #     return {
-    #         "message": f"The stock with name {stock} has been deleted",
-    #         "data": selected_stocks
-    #     }, 200
-    # else:
-    #     return {
-    #         "message": f"The stock with name {stock} is not present"
-    #     }, 400
 
 
 @stocks_input.get("/all-stocks")
