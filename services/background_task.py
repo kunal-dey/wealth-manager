@@ -13,6 +13,7 @@ from models.stages.position import Position
 from models.stock_info import StockInfo
 from models.wallet import Wallet
 from routes.stock_input import chosen_stocks, delete_stock_fn, set_delete_stock_to_none
+from routes.wallet_input import cash_reduction_fn, set_cash_reduction_to_none
 from utils.logger import get_logger
 from utils.tracking_components.fetch_prices import fetch_current_prices
 from constants.enums.shift import Shift
@@ -133,7 +134,7 @@ async def background_task():
 
     logger.info(f"starting cash: {account.available_cash}")
 
-    blacklisted_stocks = []
+    blacklisted_stocks = ["FOCUS", "DCAL", "EXXARO", "DCXINDIA", "GSS"]
 
     """
         model and parameter setup
@@ -177,6 +178,10 @@ async def background_task():
 
         # even if any error occurs it will not break it
         try:
+
+            account.available_cash -= cash_reduction_fn()
+            set_cash_reduction_to_none()
+
             if not_loaded and current_time >= START_TIME:
                 filtered_stocks = [i[:-3] for i in list(prediction_df.columns)]
 
