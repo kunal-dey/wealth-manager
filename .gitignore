@@ -4,4 +4,5 @@ __pycache__/
 constants/kite_credentials.py
 *.csv
 !EQUITY_NSE.csv
+!pe-ratio.csv
 stock_action.log
