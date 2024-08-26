@@ -16,6 +16,7 @@ from utils.logger import get_logger
 from routes.stock_input import stocks_input
 from utils.tracking_components.training_components.trained_model import train_model
 from utils.tracking_components.verify_symbols import get_correct_symbol
+from utils.financials.load_financials import get_price_df, get_financial_df
 
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
@@ -85,6 +86,11 @@ async def stop_background_tasks():
 
 @app.get("/train")
 async def train():
+    try:
+        # to test whether the access toke has been set after login
+        _ = kite_context.ltp("NSE:INFY")
+    except InputException:
+        return {"message": "Kindly login first"}
     obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=5000)
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
@@ -104,6 +110,25 @@ async def add_elements():
     await wallet.create_wallet()
     return {"msg": "wallet"}
 
+
+@app.get("/load-financials")
+async def load_financials():
+    try:
+        # to test whether the access toke has been set after login
+        _ = kite_context.ltp("NSE:INFY")
+    except InputException:
+        return {"message": "Kindly login first"}
+
+    async def load():
+        obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=5000)
+        price_df = get_price_df(obtained_stock_list)
+        logger.info(price_df)
+
+        eps_df = get_financial_df(obtained_stock_list, 5)
+        logger.info(eps_df)
+
+    app.add_background_task(load)
+    return {"msg": "loaded price_df"}
 
 resource_list: list[Blueprint] = [stocks_input, wallet_input]
 

@@ -59,10 +59,4 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
             if a == b:
                 stocks_present.append(a)
 
-    low_pe_df = pd.read_csv(getcwd() + "/temp/pe-ratio.csv").dropna()
-    low_pe_df = low_pe_df[(low_pe_df['Price to Earning'] < 30)]
-    for st in stocks_present:
-        if st not in list(low_pe_df["NSE Code"]):
-            stocks_present.remove(st)
-
     return stocks_present

@@ -19,10 +19,11 @@ from utils.tracking_components.fetch_prices import fetch_current_prices
 from constants.enums.shift import Shift
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
-    set_max_stocks, DEBUG, set_end_process, START_BUYING_TIME_MORNING, STOP_BUYING_TIME_MORNING,START_BUYING_TIME_EVENING, STOP_BUYING_TIME_EVENING, TRAINING_DATE, \
+    set_max_stocks, DEBUG, set_end_process, START_BUYING_TIME_MORNING, STOP_BUYING_TIME_MORNING, START_BUYING_TIME_EVENING, STOP_BUYING_TIME_EVENING, TRAINING_DATE, \
     EXPECTED_MINIMUM_MONTHLY_RETURN
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
+from utils.financials.checks import low_pe, increasing_eps, increasing_sales
 
 logger: Logger = get_logger(__name__)
 
@@ -134,7 +135,7 @@ async def background_task():
 
     logger.info(f"starting cash: {account.available_cash}")
 
-    blacklisted_stocks = ["FOCUS", "DCAL", "EXXARO", "DCXINDIA", "GSS"]
+    blacklisted_stocks = []
 
     """
         model and parameter setup
@@ -167,6 +168,26 @@ async def background_task():
 
     # this part will loop till the trading times end
     current_time = datetime.now()
+
+    # financials
+    price_df = pd.read_csv(f"temp/financials/price_df.csv", index_col=0)
+    eps_df = pd.read_csv(f"temp/financials/eps_df.csv", index_col=0)
+    sales_df = pd.read_csv(f"temp/financials/sales_df.csv", index_col=0)
+
+    low_pe_list = []
+    for pr_stock in price_df.columns:
+        if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
+            if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
+                low_pe_list.append(pr_stock)
+    logger.info(low_pe_list)
+
+    financial_filters = []
+    for pr_stock in low_pe_list:
+        if pr_stock in sales_df.columns:
+            if increasing_sales(pr_stock, sales_df):
+                financial_filters.append(pr_stock)
+
+    logger.info(financial_filters)
     while current_time < END_TIME:
         current_time = datetime.now()
 
@@ -241,8 +262,17 @@ async def background_task():
                             filtered_chosen_stocks.append(st)
                     selected_long_stocks.extend(filtered_chosen_stocks)
 
+                    long_term_chosen_stocks = []
+
+                    if len(financial_filters) > 0:
+                        for financial_stock in financial_filters:
+                            if financial_stock in selected_long_stocks:
+                                long_term_chosen_stocks.append(financial_stock)
+                    else:
+                        long_term_chosen_stocks = selected_long_stocks
+
                     # selecting stock which meets the criteria
-                    for stock_col in selected_long_stocks:
+                    for stock_col in long_term_chosen_stocks:
                         if stock_col not in blacklisted_stocks:
                             # available cash keeps on changing so max_stocks keeps on changing
                             # the stock will be added if it is added for the first time
