@@ -121,7 +121,7 @@ class Stage:
         selling_price = self.current_price
         tx_cost = self.stock.transaction_cost(buying_price=buy_price, selling_price=selling_price) / self.quantity
         wallet_value = (selling_price - (buy_price + tx_cost))*self.quantity
-        monthly_return = EXPECTED_MINIMUM_MONTHLY_RETURN if self.stock.number_of_days <= 16 else 0.04
+        monthly_return = EXPECTED_MINIMUM_MONTHLY_RETURN if self.stock.number_of_days <= 16 else 0.08
 
         if force:
             if short(
@@ -135,7 +135,7 @@ class Stage:
                 logger.info(f"Wallet: {self.stock.wallet}")
                 return True
 
-        if 1+(wallet_value/get_allocation()) > (1+monthly_return)**(self.stock.number_of_days/20):
+        if wallet_value/get_allocation() > monthly_return:
             if short(
                     symbol=self.stock.stock_name,
                     quantity=self.quantity,

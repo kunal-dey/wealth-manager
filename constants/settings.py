@@ -42,7 +42,7 @@ INTRADAY_INCREMENTAL_RETURN = 0.005
 
 STARTING_CASH = 150001
 
-EXPECTED_MINIMUM_MONTHLY_RETURN = 0.1  # minimum monthly_return which is expected
+EXPECTED_MINIMUM_MONTHLY_RETURN = 0.06  # minimum monthly_return which is expected
 
 # total investment
 MAXIMUM_STOCKS = 10
