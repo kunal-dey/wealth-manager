@@ -17,3 +17,8 @@ def increasing_eps(stock_name, eps):
 def increasing_sales(stock_name, sales):
     return sales[stock_name].iloc[0] > sales[stock_name].iloc[1]
 
+
+def increasing_operating_profit(stock_name, operating_profit):
+    return operating_profit[stock_name].iloc[0] > operating_profit[stock_name].iloc[1]
+
+

@@ -7,4 +7,5 @@ constants/kite_credentials.py
 !eps_df.csv
 !price_df.csv
 !sales_df.csv
+!operating_profit_df.csv
 stock_action.log

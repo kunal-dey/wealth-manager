@@ -23,7 +23,7 @@ from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_pro
     EXPECTED_MINIMUM_MONTHLY_RETURN
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
-from utils.financials.checks import low_pe, increasing_eps, increasing_sales
+from utils.financials.checks import low_pe, increasing_eps, increasing_sales, increasing_operating_profit
 
 logger: Logger = get_logger(__name__)
 
@@ -173,6 +173,7 @@ async def background_task():
     price_df = pd.read_csv(f"temp/financials/price_df.csv", index_col=0)
     eps_df = pd.read_csv(f"temp/financials/eps_df.csv", index_col=0)
     sales_df = pd.read_csv(f"temp/financials/sales_df.csv", index_col=0)
+    operating_profit_df = pd.read_csv(f"temp/financials/operating_profit_df.csv", index_col=0)
 
     low_pe_list = []
     for pr_stock in price_df.columns:
@@ -181,8 +182,22 @@ async def background_task():
                 low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 
-    financial_filters = []
+    increasing_op_list = []
     for pr_stock in low_pe_list:
+        if pr_stock in operating_profit_df.columns:
+            if increasing_operating_profit(pr_stock, operating_profit_df):
+                increasing_op_list.append(pr_stock)
+    logger.info(increasing_op_list)
+
+    increasing_eps_list = []
+    for pr_stock in increasing_op_list:
+        if pr_stock in eps_df.columns:
+            if increasing_eps(pr_stock, eps_df):
+                increasing_eps_list.append(pr_stock)
+    logger.info(increasing_eps_list)
+
+    financial_filters = []
+    for pr_stock in increasing_eps_list:
         if pr_stock in sales_df.columns:
             if increasing_sales(pr_stock, sales_df):
                 financial_filters.append(pr_stock)

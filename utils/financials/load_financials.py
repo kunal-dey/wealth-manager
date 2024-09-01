@@ -28,6 +28,8 @@ def get_financial_df(stock_list, n):
     eps_df = None
     sales_result = {}
     sales_df = None
+    operating_profit_result = {}
+    operating_profit_df = None
     # try:
     if True:
         for stock in stock_list:
@@ -37,7 +39,7 @@ def get_financial_df(stock_list, n):
             response = None
             while retries < 3:
                 try:
-                    response = requests.get(f"https://www.screener.in/company/{stock}/consolidated/")
+                    response = requests.get(f"https://www.screener.in/company/{stock}/")
                     break
                 except:
                     sleep(2)
@@ -58,7 +60,7 @@ def get_financial_df(stock_list, n):
                 eps_ttm = [sum(remove_name[i-3:i+1]) if i+1 > 3 else 0 for i in range(len(remove_name))]
 
                 if len(list(reversed(eps_ttm[-n:]))) != n:
-                    logger.info("invalid")
+                    logger.info("eps invalid")
                     logger.info(list(reversed(eps_ttm[-n:])))
                 else:
                     eps_result[stock] = list(reversed(eps_ttm[-n:]))
@@ -80,10 +82,32 @@ def get_financial_df(stock_list, n):
                 sales_ttm = [float(element.replace(",", "")) for element in quarter_list[1:]]
 
                 if len(list(reversed(sales_ttm[-n:]))) != n:
-                    logger.info("invalid")
+                    logger.info("sales invalid")
                     logger.info(list(reversed(sales_ttm[-n:])))
                 else:
                     sales_result[stock] = list(reversed(sales_ttm[-n:]))
+
+                # to get Operating Profit
+                soup = BeautifulSoup(response.text, 'html.parser')
+                quarter = soup.find(id='quarters')
+
+                operating_profit = quarter.find(string=re.compile("Operating Profit"))
+                if operating_profit:
+                    operating_profit = operating_profit.parent.parent
+                else:
+                    continue
+                quarter_list = []
+                for t in operating_profit:
+                    el = t.text.replace('\n', '')
+                    if el:
+                        quarter_list.append(t.text)
+                operating_profit_ttm = [float(element.replace(",", "")) for element in quarter_list[1:]]
+
+                if len(list(reversed(operating_profit_ttm[-n:]))) != n:
+                    logger.info("operating_profit invalid")
+                    logger.info(list(reversed(operating_profit_ttm[-n:])))
+                else:
+                    operating_profit_result[stock] = list(reversed(operating_profit_ttm[-n:]))
 
         if len(eps_result) > 0:
             eps_df = pd.DataFrame(eps_result).transpose()
@@ -112,7 +136,21 @@ def get_financial_df(stock_list, n):
                 sales_df = pd.read_csv(f"temp/financials/sales_df.csv", index_col=0)
             except:
                 sales_df = None
-    return eps_df, sales_df
+
+        if len(operating_profit_result) > 0:
+            operating_profit_df = pd.DataFrame(operating_profit_result).transpose()
+            operating_profit_df.columns = get_quarters()
+            operating_profit_df = operating_profit_df.transpose()
+            operating_profit_df.insert(len(operating_profit_df.columns), 'Unnamed: 0', pd.to_datetime(operating_profit_df.index))
+            operating_profit_df.insert(len(operating_profit_df.columns), 'Quarter', operating_profit_df['Unnamed: 0'].dt.to_period('Q'))
+            operating_profit_df.drop(['Unnamed: 0'], axis=1)
+            operating_profit_df.to_csv(f"temp/financials/operating_profit_df.csv")
+        else:
+            try:
+                operating_profit_df = pd.read_csv(f"temp/financials/operating_profit_df.csv", index_col=0)
+            except:
+                operating_profit_df = None
+    return eps_df, sales_df, operating_profit_df
 
 
 def get_price_df(stock_list):
