@@ -58,7 +58,7 @@ def predict_running_df(day_based_data, model, params):
         logger.info(running_df)
         running_df_s = (running_df-mu)/sigma
         running_df['prob'] = model.predict(running_df_s)
-        running_df['position'] = np.where(running_df['prob'] > 0.7, 1, 0)
+        running_df['position'] = np.where(running_df['prob'] > 0.4, 1, 0)
         logger.info(running_df)
 
         selected = []

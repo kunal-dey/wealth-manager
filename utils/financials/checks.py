@@ -6,7 +6,7 @@ def low_pe(stock_name: str, price_df: pd.DataFrame, eps_df: pd.DataFrame):
         stock_df = pd.merge(price_df[['Quarter', stock_name]], eps_df[['Quarter', stock_name]], on='Quarter', how='left')
         stock_df["pe"] = stock_df[f"{stock_name}_x"]/stock_df[f"{stock_name}_y"]
         if stock_df["pe"].iloc[-1] > 0:
-            return stock_df["pe"].iloc[-1] < stock_df["pe"].median()
+            return stock_df["pe"].iloc[-1]/stock_df["pe"].median() < 0.9
     return None
 
 
