@@ -39,7 +39,7 @@ async def background_task():
     account: Account = Account()
 
     # prediction_df columns contains .NS whereas obtained_stock_list has all stocks which can be traded and are in mis
-    prediction_df, obtained_stock_list = None, await get_correct_symbol(higher_price=5000)
+    prediction_df, obtained_stock_list = None, await get_correct_symbol(lower_price=30, higher_price=6000)
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
     logger.info(f"non BE stock list : {obtained_stock_list}")
 

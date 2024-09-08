@@ -93,7 +93,7 @@ def train_model(stock_list, shift: Shift):
 
     logger.info(f"size: {data_df}")
 
-    train, train_s, test, test_s = split_data(split_ratio=1, data_df=data_df, shift=shift)
+    train, train_s, test, test_s = split_data(split_ratio=0.99, data_df=data_df, shift=shift)
 
     def set_seeds(seed=100):
         random.seed(seed)
@@ -129,5 +129,26 @@ def train_model(stock_list, shift: Shift):
         model.save(getcwd() + "/temp/DNN_model_evening")
 
     logger.info(f"model saved: {model}")
+
+    logger.info(test_s)
+    test_s["prediction"] = model.predict(test_s[features])
+
+    logger.info("0.4-0.5")
+    logger.info(test_s[(test_s["prediction"] >= 0.4) & (test_s["prediction"] < 0.5)]["dir"].value_counts())
+
+    logger.info("0.5-0.6")
+    logger.info(test_s[(test_s["prediction"] >= 0.5) & (test_s["prediction"] < 0.6)]["dir"].value_counts())
+
+    logger.info("0.6-0.7")
+    logger.info(test_s[(test_s["prediction"] >= 0.6) & (test_s["prediction"] < 0.7)]["dir"].value_counts())
+
+    logger.info("0.7-0.8")
+    logger.info(test_s[(test_s["prediction"] >= 0.7) & (test_s["prediction"] < 0.8)]["dir"].value_counts())
+
+    logger.info("0.8-0.9")
+    logger.info(test_s[(test_s["prediction"] >= 0.8) & (test_s["prediction"] < 0.9)]["dir"].value_counts())
+
+    logger.info("0.9-1")
+    logger.info(test_s[test_s["prediction"] >= 0.9]["dir"].value_counts())
 
     return {"msg": "trained"}

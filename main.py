@@ -91,7 +91,7 @@ async def train():
         _ = kite_context.ltp("NSE:INFY")
     except InputException:
         return {"message": "Kindly login first"}
-    obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=5000)
+    obtained_stock_list = await get_correct_symbol(lower_price=30, higher_price=6000)
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 
