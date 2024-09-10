@@ -182,27 +182,29 @@ async def background_task():
                 low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 
-    increasing_op_list = []
-    for pr_stock in low_pe_list:
-        if pr_stock in operating_profit_df.columns:
-            if increasing_operating_profit(pr_stock, operating_profit_df):
-                increasing_op_list.append(pr_stock)
-    logger.info(increasing_op_list)
+    financial_filters = low_pe_list
 
-    increasing_eps_list = []
-    for pr_stock in increasing_op_list:
-        if pr_stock in eps_df.columns:
-            if increasing_eps(pr_stock, eps_df):
-                increasing_eps_list.append(pr_stock)
-    logger.info(increasing_eps_list)
-
-    financial_filters = []
-    for pr_stock in increasing_eps_list:
-        if pr_stock in sales_df.columns:
-            if increasing_sales(pr_stock, sales_df):
-                financial_filters.append(pr_stock)
-
-    logger.info(financial_filters)
+    # increasing_op_list = []
+    # for pr_stock in low_pe_list:
+    #     if pr_stock in operating_profit_df.columns:
+    #         if increasing_operating_profit(pr_stock, operating_profit_df):
+    #             increasing_op_list.append(pr_stock)
+    # logger.info(increasing_op_list)
+    #
+    # increasing_eps_list = []
+    # for pr_stock in increasing_op_list:
+    #     if pr_stock in eps_df.columns:
+    #         if increasing_eps(pr_stock, eps_df):
+    #             increasing_eps_list.append(pr_stock)
+    # logger.info(increasing_eps_list)
+    #
+    # financial_filters = []
+    # for pr_stock in increasing_eps_list:
+    #     if pr_stock in sales_df.columns:
+    #         if increasing_sales(pr_stock, sales_df):
+    #             financial_filters.append(pr_stock)
+    #
+    # logger.info(financial_filters)
     while current_time < END_TIME:
         current_time = datetime.now()
 

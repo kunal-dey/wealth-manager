@@ -1,4 +1,8 @@
 import pandas as pd
+from logging import Logger
+from utils.logger import get_logger
+
+logger: Logger = get_logger(__name__)
 
 
 def low_pe(stock_name: str, price_df: pd.DataFrame, eps_df: pd.DataFrame):
@@ -6,12 +10,13 @@ def low_pe(stock_name: str, price_df: pd.DataFrame, eps_df: pd.DataFrame):
         stock_df = pd.merge(price_df[['Quarter', stock_name]], eps_df[['Quarter', stock_name]], on='Quarter', how='left')
         stock_df["pe"] = stock_df[f"{stock_name}_x"]/stock_df[f"{stock_name}_y"]
         if stock_df["pe"].iloc[-1] > 0:
-            return stock_df["pe"].iloc[-1]/stock_df["pe"].median() < 0.9
+            return stock_df["pe"].iloc[-1] / stock_df["pe"].median() < 0.9 and 28 < stock_df["pe"].median() < 100
     return None
 
 
 def increasing_eps(stock_name, eps):
-    return eps[stock_name].iloc[0] > eps[stock_name].iloc[1]
+    # return eps[stock_name].iloc[0] > eps[stock_name].iloc[1]
+    return eps[stock_name].iloc[0] > 0
 
 
 def increasing_sales(stock_name, sales):
