@@ -20,7 +20,8 @@ def get_schema():
         "quantity": "int",
         "product_type": ProductType,
         "position_type": PositionType,
-        "stock": StockInfo
+        "stock": StockInfo,
+        "trigger": "float"
     }
 
 

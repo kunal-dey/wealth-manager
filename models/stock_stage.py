@@ -24,7 +24,7 @@ class Stage:
     stock: None | StockInfo = None
     current_price: float = field(default=None, init=False)
     last_price: float = field(default=None, init=False)
-    trigger: float | None = field(default=None, init=False)
+    trigger: float | None = field(default=None)
     cost: float = field(default=None, init=False)
 
     base_return: float = field(default=DELIVERY_INITIAL_RETURN, init=False)
@@ -176,8 +176,9 @@ class Stage:
             logger.info(f"{self.stock.stock_name} Earlier trigger:  {self.trigger}, latest price:{self.current_price}")
             if self.trigger is not None:
                 # if it hits trigger then square off else reset a new trigger
-                if self.cost * (1 + self.current_expected_return + (
-                        1 / 2) * self.incremental_return) < self.current_price < self.trigger:
+                # if self.cost * (1 + self.current_expected_return + (
+                #         1 / 2) * self.incremental_return) < self.current_price < self.trigger:
+                if self.current_price < self.trigger * (1 - (3/4) * self.incremental_return):
                     if DEBUG:
                         # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                         if self.sell():
