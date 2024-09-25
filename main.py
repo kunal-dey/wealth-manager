@@ -18,6 +18,8 @@ from utils.tracking_components.training_components.trained_model import train_mo
 from utils.tracking_components.verify_symbols import get_correct_symbol
 from utils.financials.load_financials import get_price_df, get_financial_df
 
+import pandas as pd
+
 app = Quart(__name__)
 app.config["PROPAGATE_EXCEPTIONS"] = True
 app = cors(app, allow_origin="*")
@@ -128,6 +130,35 @@ async def load_financials():
         logger.info(eps_df)
 
     app.add_background_task(load)
+    return {"msg": "loaded price_df"}
+
+
+@app.get("/huge-sales")
+async def huge_sales():
+    sales_df = pd.read_csv(f"temp/financials/sales_df.csv", index_col=0)
+    transpose = sales_df.transpose()
+    transpose = transpose.iloc[:-2]
+    cols = list(transpose.columns)
+    transpose["inc1"] = transpose[cols[0]].astype(float)
+    transpose["inc2"] = transpose[cols[1]].astype(float) * 1.5
+
+    sales_list = list(transpose[transpose["inc1"] > transpose["inc2"]].index)
+
+    eps_df = pd.read_csv(f"temp/financials/eps_df.csv", index_col=0)
+    transpose = eps_df.transpose()
+    transpose = transpose.iloc[:-2]
+    cols = list(transpose.columns)
+    transpose["inc1"] = transpose[cols[0]].astype(float)
+    transpose["inc2"] = transpose[cols[1]].astype(float)
+    eps_list = list(transpose[transpose["inc1"] > transpose["inc2"]].index)
+
+    filter = []
+
+    for v in sales_list:
+        if v in eps_list:
+            filter.append(v)
+
+    logger.info(filter)
     return {"msg": "loaded price_df"}
 
 resource_list: list[Blueprint] = [stocks_input, wallet_input]

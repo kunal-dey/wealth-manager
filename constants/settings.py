@@ -1,6 +1,6 @@
 from datetime import datetime
 
-DEBUG = False
+DEBUG = True
 
 # time settings
 __current_time = datetime.now()

@@ -59,4 +59,4 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
             if a == b:
                 stocks_present.append(a)
 
-    return stocks_present
+    return list(temp_df.index)
