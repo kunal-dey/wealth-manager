@@ -178,7 +178,7 @@ class Stage:
                 # if it hits trigger then square off else reset a new trigger
                 # if self.cost * (1 + self.current_expected_return + (
                 #         1 / 2) * self.incremental_return) < self.current_price < self.trigger:
-                if self.current_price < self.trigger * (1 - (3/4) * self.incremental_return):
+                if self.current_price < self.trigger * (1 - self.incremental_return):
                     if DEBUG:
                         # if self.stock.stock_name in self.stock.chosen_short_stocks and self.stock.stock_name not in self.stock.chosen_long_stocks:
                         if self.sell():

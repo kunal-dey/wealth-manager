@@ -177,9 +177,14 @@ async def background_task():
     operating_profit_df = pd.read_csv(f"temp/financials/operating_profit_df.csv", index_col=0)
 
     low_pe_list = []
-    for pr_stock in price_df.columns:
-        if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
-            if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
+    # for pr_stock in price_df.columns:
+    #     if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
+    #         if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
+    #             low_pe_list.append(pr_stock)
+
+    for pr_stock in sales_df.columns:
+        if pr_stock not in ["Unnamed: 0", "Quarter"]:
+            if increasing_sales(pr_stock, sales_df):
                 low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 

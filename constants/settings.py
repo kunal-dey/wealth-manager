@@ -1,6 +1,6 @@
 from datetime import datetime
 
-DEBUG = True
+DEBUG = False
 
 # time settings
 __current_time = datetime.now()
@@ -34,11 +34,11 @@ SLEEP_INTERVAL = 1 if DEBUG else 45
 
 # expected returns are set in this section
 DELIVERY_INITIAL_RETURN = 0.02
-DELIVERY_INCREMENTAL_RETURN = 0.04
+DELIVERY_INCREMENTAL_RETURN = 0.03
 DAILY_MINIMUM_RETURN = 0.02
 
 INTRADAY_INITIAL_RETURN = 0.02
-INTRADAY_INCREMENTAL_RETURN = 0.04
+INTRADAY_INCREMENTAL_RETURN = 0.03
 
 STARTING_CASH = 150001
 
