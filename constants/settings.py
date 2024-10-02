@@ -23,26 +23,26 @@ if DEBUG:
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 23, 58, 0)
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
-    START_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 30, 0)
-    STOP_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 10, 15, 0)
+    START_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 16, 10, 0)
+    STOP_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 16, 15, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
-    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 13, 30, 0)
+    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 12, 0)
     STOP_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)
 
 SLEEP_INTERVAL = 1 if DEBUG else 45
 
 # expected returns are set in this section
-DELIVERY_INITIAL_RETURN = 0.02
-DELIVERY_INCREMENTAL_RETURN = 0.03
-DAILY_MINIMUM_RETURN = 0.02
+DELIVERY_INITIAL_RETURN = 0.01
+DELIVERY_INCREMENTAL_RETURN = 0.02
+DAILY_MINIMUM_RETURN = 0.01
 
-INTRADAY_INITIAL_RETURN = 0.02
-INTRADAY_INCREMENTAL_RETURN = 0.03
+INTRADAY_INITIAL_RETURN = 0.01
+INTRADAY_INCREMENTAL_RETURN = 0.02
 
 STARTING_CASH = 150001
 
-EXPECTED_MINIMUM_MONTHLY_RETURN = 0.02  # minimum monthly_return which is expected
+EXPECTED_MINIMUM_MONTHLY_RETURN = 0.01  # minimum monthly_return which is expected
 
 # total investment
 MAXIMUM_STOCKS = 10

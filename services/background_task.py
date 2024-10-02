@@ -177,15 +177,15 @@ async def background_task():
     operating_profit_df = pd.read_csv(f"temp/financials/operating_profit_df.csv", index_col=0)
 
     low_pe_list = []
-    # for pr_stock in price_df.columns:
-    #     if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
-    #         if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
-    #             low_pe_list.append(pr_stock)
-
-    for pr_stock in sales_df.columns:
-        if pr_stock not in ["Unnamed: 0", "Quarter"]:
-            if increasing_sales(pr_stock, sales_df):
+    for pr_stock in price_df.columns:
+        if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
+            if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
                 low_pe_list.append(pr_stock)
+
+    # for pr_stock in sales_df.columns:
+    #     if pr_stock not in ["Unnamed: 0", "Quarter"]:
+    #         if increasing_sales(pr_stock, sales_df):
+    #             low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 
     financial_filters = low_pe_list
@@ -295,7 +295,7 @@ async def background_task():
                         long_term_chosen_stocks = selected_long_stocks
 
                     # selecting stock which meets the criteria
-                    for stock_col in long_term_chosen_stocks:
+                    for stock_col in selected_long_stocks:
                         if stock_col not in blacklisted_stocks:
                             # available cash keeps on changing so max_stocks keeps on changing
                             # the stock will be added if it is added for the first time

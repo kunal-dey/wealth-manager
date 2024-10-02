@@ -158,6 +158,9 @@ def get_price_df(stock_list):
     try:
         yfinance_tickers = [f"{stock}.NS" for stock in stock_list]
         price_df = yf.download(tickers=yfinance_tickers, period='1y', interval='1d')["Close"]
+        price_df = price_df.ffill().bfill()
+        price_df.index = pd.to_datetime(price_df.index)
+        price_df = price_df.loc[:str(TRAINING_DATE.date())]
         logger.info(price_df)
         price_df.columns = [st[:-3] for st in price_df.columns]
         logger.info(price_df)

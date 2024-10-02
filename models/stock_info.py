@@ -349,13 +349,13 @@ class StockInfo:
             line_df['ema'] = line_df.line.ewm(span=5, adjust=False).mean()
 
             if shift == Shift.EVENING:
-                if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
-                    logger.info("entered on whether to buy the stock in evening")
-                    if line_df['ema'].iloc[-3] < line_df['ema'].iloc[-6]:
-                        return True
-            if shift == Shift.MORNING:
-                if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
-                    logger.info("entered on whether to buy the stock in morning")
-                    if line_df['ema'].iloc[-1] > line_df['ema'].iloc[-3] > line_df['ema'].iloc[-5]:
-                        return True
+                # if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
+                #     logger.info("entered on whether to buy the stock in evening")
+                #     if line_df['ema'].iloc[-3] < line_df['ema'].iloc[-6]:
+                return True
+            # if shift == Shift.MORNING:
+            #     if True in list(ohlc_data_yes[matching_columns_yes].iloc[-1]) and True not in list(ohlc_data_no[matching_columns_no].iloc[-1]):
+            #         logger.info("entered on whether to buy the stock in morning")
+            #         if line_df['ema'].iloc[-1] > line_df['ema'].iloc[-3] > line_df['ema'].iloc[-5]:
+            #             return True
         return False

@@ -14,4 +14,4 @@ class Position(Stage):
         if self.product_type == ProductType.DELIVERY:
             return INTRADAY_INCREMENTAL_RETURN
         else:
-            return 0.03
+            return 0.02
