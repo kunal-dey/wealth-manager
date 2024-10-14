@@ -26,7 +26,7 @@ else:
     START_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 16, 10, 0)
     STOP_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 16, 15, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
-    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 12, 0)
+    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 13, 30, 0)
     STOP_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)
 
