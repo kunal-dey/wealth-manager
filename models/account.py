@@ -163,7 +163,8 @@ class Account:
                 quantity=position.quantity,
                 product_type=position.product_type,
                 position_type=position.position_type,
-                stock=position.stock
+                stock=position.stock,
+                trigger=position.trigger
             )
 
     def convert_holdings_to_positions(self):
@@ -181,7 +182,8 @@ class Account:
                 quantity=holding.quantity,
                 product_type=holding.product_type,
                 position_type=holding.position_type,
-                stock=holding.stock
+                stock=holding.stock,
+                trigger=holding.trigger
             )
 
     async def store_all_holdings(self):
