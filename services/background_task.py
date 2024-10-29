@@ -1,6 +1,6 @@
 import os
 import pickle
-from datetime import datetime, timedelta
+from datetime import datetime
 from asyncio import sleep
 from logging import Logger
 import yfinance as yf
@@ -69,14 +69,12 @@ async def background_task():
 
     # loading day based price df from yahoo finance
     day_based_price_df = None
-    daily_data = None
 
     try:
         day_based_price_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1y', interval='1d')[['Close', 'High', 'Low', 'Open']]
         day_based_price_df = day_based_price_df.ffill().bfill()
         day_based_price_df.index = pd.to_datetime(day_based_price_df.index)
         day_based_price_df = day_based_price_df.loc[:str(TRAINING_DATE.date())]
-        daily_data = day_based_price_df.copy()
         logger.info(day_based_price_df)
         day_based_price_df.reset_index(drop=True, inplace=True)
         day_based_price_df.to_csv(f"temp/day_based_price_df.csv")
@@ -180,15 +178,15 @@ async def background_task():
     operating_profit_df = pd.read_csv(f"temp/financials/operating_profit_df.csv", index_col=0)
 
     low_pe_list = []
-    for pr_stock in price_df.columns:
-        if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
-            if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
-                low_pe_list.append(pr_stock)
-
-    # for pr_stock in sales_df.columns:
-    #     if pr_stock not in ["Unnamed: 0", "Quarter"]:
-    #         if increasing_sales(pr_stock, sales_df):
+    # for pr_stock in price_df.columns:
+    #     if pr_stock not in ["Date", "Quarter"] and pr_stock in eps_df.columns:
+    #         if low_pe(stock_name=pr_stock, price_df=price_df, eps_df=eps_df):
     #             low_pe_list.append(pr_stock)
+
+    for pr_stock in sales_df.columns:
+        if pr_stock not in ["Unnamed: 0", "Quarter"]:
+            if increasing_sales(pr_stock, sales_df):
+                low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 
     financial_filters = low_pe_list
@@ -260,13 +258,10 @@ async def background_task():
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
                 # listing those stocks first with less VaR
-                # data_resampled = prediction_df.iloc[::60, :]
-                # log_returns = data_resampled.pct_change()
-                # VaR_95 = log_returns.quantile(0.005, interpolation='lower')
+                data_resampled = prediction_df.iloc[::60, :]
+                log_returns = data_resampled.pct_change()
+                VaR_95 = log_returns.quantile(0.005, interpolation='lower')
 
-                old_date = (TRAINING_DATE - timedelta(days=6)).date()
-                increment = (daily_data["Close"].loc[old_date:].pct_change()+1).dropna()
-                increment_stocks = list(increment.min()[increment.min() > 1].index)
                 stock_list = []
 
                 if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
@@ -274,13 +269,7 @@ async def background_task():
                 elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
                     stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
 
-                predicted_stocks = []
-
-                for inc_st in increment_stocks:
-                    if inc_st in stock_list:
-                        predicted_stocks.append(inc_st)
-
-                # predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
+                predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
 
                 selected_long_stocks = [st[:-3] for st in predicted_stocks]
 
@@ -309,7 +298,7 @@ async def background_task():
                         long_term_chosen_stocks = selected_long_stocks
 
                     # selecting stock which meets the criteria
-                    for stock_col in selected_long_stocks:
+                    for stock_col in long_term_chosen_stocks:
                         if stock_col not in blacklisted_stocks:
                             # available cash keeps on changing so max_stocks keeps on changing
                             # the stock will be added if it is added for the first time
