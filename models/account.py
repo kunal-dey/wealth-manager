@@ -23,7 +23,7 @@ def get_available_cash():
         return STARTING_CASH
     else:
         payload = kite_context.margins()
-        return payload['equity']['available']['live_balance']
+        return max((payload['equity']['available']['live_balance'] - 150000), 0)
 
 
 @dataclass
