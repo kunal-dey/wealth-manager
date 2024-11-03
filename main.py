@@ -12,6 +12,7 @@ from routes.wallet_input import wallet_input
 
 from services.background_task import background_task
 from constants.global_contexts import kite_context
+from constants.settings import STOCK_LOWER_PRICE, STOCK_UPPER_PRICE
 from utils.logger import get_logger
 from routes.stock_input import stocks_input
 from utils.tracking_components.training_components.trained_model import train_model
@@ -93,7 +94,7 @@ async def train():
         _ = kite_context.ltp("NSE:INFY")
     except InputException:
         return {"message": "Kindly login first"}
-    obtained_stock_list = await get_correct_symbol(lower_price=30, higher_price=6000)
+    obtained_stock_list = await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
     logger.info(obtained_stock_list)
     logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 
@@ -122,7 +123,7 @@ async def load_financials():
         return {"message": "Kindly login first"}
 
     async def load():
-        obtained_stock_list = await get_correct_symbol(lower_price=50, higher_price=5000)
+        obtained_stock_list = await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
         price_df = get_price_df(obtained_stock_list)
         logger.info(price_df)
 

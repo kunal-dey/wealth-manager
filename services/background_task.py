@@ -20,7 +20,7 @@ from constants.enums.shift import Shift
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
     set_max_stocks, DEBUG, set_end_process, START_BUYING_TIME_MORNING, STOP_BUYING_TIME_MORNING, START_BUYING_TIME_EVENING, STOP_BUYING_TIME_EVENING, TRAINING_DATE, \
-    EXPECTED_MINIMUM_MONTHLY_RETURN
+    EXPECTED_MINIMUM_MONTHLY_RETURN, STOCK_LOWER_PRICE, STOCK_UPPER_PRICE
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 from utils.financials.checks import low_pe, increasing_eps, increasing_sales, increasing_operating_profit
@@ -39,7 +39,7 @@ async def background_task():
     account: Account = Account()
 
     # prediction_df columns contains .NS whereas obtained_stock_list has all stocks which can be traded and are in mis
-    prediction_df, obtained_stock_list = None, await get_correct_symbol(lower_price=30, higher_price=6000)
+    prediction_df, obtained_stock_list = None, await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
     logger.info(f"non BE stock list : {obtained_stock_list}")
     obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
     logger.info(f"non BE stock list : {obtained_stock_list}")

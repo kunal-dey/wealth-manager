@@ -1,12 +1,11 @@
 import os
 from dataclasses import dataclass, field
 from logging import Logger
-from datetime import datetime
 
 from constants.enums.position_type import PositionType
 from constants.enums.product_type import ProductType
 from constants.enums.shift import Shift
-from constants.settings import DEBUG, STARTING_CASH, get_allocation
+from constants.settings import DEBUG, STARTING_CASH, get_allocation, MAXIMUM_ALLOWED_CASH
 from constants.global_contexts import kite_context
 from models.db_models.db_functions import retrieve_all_services, jsonify, find_by_name
 from models.stages.holding import Holding
@@ -23,7 +22,7 @@ def get_available_cash():
         return STARTING_CASH
     else:
         payload = kite_context.margins()
-        return payload['equity']['available']['live_balance']
+        return min(payload['equity']['available']['live_balance'], MAXIMUM_ALLOWED_CASH)
 
 
 @dataclass

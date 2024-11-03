@@ -1,6 +1,4 @@
-import json
 from logging import Logger
-from kiteconnect.exceptions import InputException
 
 from constants.enums.product_type import ProductType
 from constants.global_contexts import kite_context

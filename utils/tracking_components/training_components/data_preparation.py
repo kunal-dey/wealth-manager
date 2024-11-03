@@ -29,7 +29,7 @@ def generate_data(stock_df):
         :return:
         """
         returns = (x.pct_change()+1).cumprod()
-        return 0 if returns[returns > 1.08].shape[0] == 0 else 1
+        return 0 if returns[returns > 1.1].shape[0] == 0 else 1
 
     col_with_period = {
         '6mo': 132,

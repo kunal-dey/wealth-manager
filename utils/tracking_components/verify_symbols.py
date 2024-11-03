@@ -1,11 +1,11 @@
 import asyncio
-from os import getcwd
 import re
 
 import pandas as pd
 
 from constants.global_contexts import kite_context
 from constants.settings import MIS_STOCK_LIST
+from utils.tracking_components.get_stock_list import filter_penny_stocks
 
 
 async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_list=None):
@@ -17,7 +17,7 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
     :return: a list of symbols in correct_format e.g. ['20MICRONS-BE', 'RELIANCE']
     """
     if initial_stock_list is None:
-        initial_stock_list = pd.read_csv(getcwd() + "/temp/EQUITY_NSE.csv")[['Symbol']]
+        initial_stock_list = filter_penny_stocks()[['Symbol']]
 
     async def get_stocks(sub_list_of_stocks: list):
         """

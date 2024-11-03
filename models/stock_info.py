@@ -55,7 +55,7 @@ class StockInfo:
     wallet: float = field(default=0.0)
     _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="StockInfo", init=False)
-    COLLECTION: str = field(default="stock_dbg" if DEBUG else "stock", init=False)
+    COLLECTION: str = field(default="penny_stock_dbg" if DEBUG else "penny_stock", init=False)
     latest_price: float = field(default=None, init=False)
     created_at: datetime = field(default=TODAY)
     __result_stock_df: pd.DataFrame | None = field(default=None, init=False)
