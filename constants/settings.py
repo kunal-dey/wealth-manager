@@ -24,9 +24,9 @@ if DEBUG:
 else:
     START_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 15, 0)
     START_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 9, 30, 0)
-    STOP_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 10, 15, 0)
+    STOP_BUYING_TIME_MORNING = datetime(__current_time.year, __current_time.month, __current_time.day, 12, 30, 0)
     END_TIME = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 28)
-    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 13, 30, 0)
+    START_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 12, 30, 0)
     STOP_BUYING_TIME_EVENING = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 15, 0)
     BUY_SHORTS = datetime(__current_time.year, __current_time.month, __current_time.day, 15, 17, 0)
 
@@ -47,7 +47,7 @@ EXPECTED_MINIMUM_MONTHLY_RETURN = 0.02  # minimum monthly_return which is expect
 
 # total investment
 MAXIMUM_STOCKS = 10
-MAXIMUM_ALLOCATION = 3000
+MAXIMUM_ALLOCATION = 6000
 
 END_PROCESS = False
 

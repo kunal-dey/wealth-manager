@@ -29,7 +29,7 @@ def get_schema():
 class Holding(Stage):
     _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="Holding", init=False)
-    COLLECTION: str = field(default="penny_holding_dbg" if DEBUG else "holding", init=False)
+    COLLECTION: str = field(default="penny_holding_dbg" if DEBUG else "penny_holding", init=False)
     save_to_db: Callable = field(default=None, init=False)
     delete_from_db: Callable = field(default=None, init=False)
     update_in_db: Callable = field(default=None, init=False)

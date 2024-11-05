@@ -24,6 +24,7 @@ def predict_running_df(day_based_data, model, params):
     def predict_stocks(min_based_data, shift: Shift):
 
         stocks_df = None
+        logger.info(f"x--{min_based_data}")
 
         if shift == Shift.MORNING:
             stocks_df = pd.concat([day_based_data, min_based_data.iloc[0:1]], ignore_index=True)
@@ -63,19 +64,6 @@ def predict_running_df(day_based_data, model, params):
 
         selected = []
         predictions = list(running_df[running_df['position'] == 1].index)
-
-        try:
-            filtered_df = min_based_data[predictions]
-            line = filtered_df.apply(kaufman_indicator)
-            transformed = line.reset_index(drop=True).iloc[-30:].rolling(15).apply(get_slope)
-            logger.info(transformed)
-            filters = (transformed < transformed.shift(1)) & (transformed.shift(1) < transformed.shift(2)) & (transformed < 0)
-
-            for st in list(transformed.iloc[-1][filters.iloc[-1]].index):
-                if st in predictions:
-                    selected.append(st)
-        except:
-            logger.exception("error in transformed")
 
         return predictions
 

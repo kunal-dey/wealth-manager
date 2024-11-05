@@ -253,24 +253,24 @@ async def background_task():
                     prediction_df = prediction_df[[col for col in list(prediction_df.columns) if '-BE' not in col]]
                     prediction_df = prediction_df.iloc[-2000:]
                     prediction_df = prediction_df.reset_index(drop=True)
-                    price_filter = list(prediction_df.iloc[-1][prediction_df.iloc[-1] > 30].index)
+                    price_filter = list(prediction_df.iloc[-1][prediction_df.iloc[-1] < 30].index)
                     prediction_df = prediction_df[price_filter]
                     prediction_df.to_csv(f"temp/prediction_df.csv")
 
-                # listing those stocks first with less VaR
-                data_resampled = prediction_df.iloc[::60, :]
-                log_returns = data_resampled.pct_change()
-                VaR_95 = log_returns.quantile(0.005, interpolation='lower')
+                # # listing those stocks first with less VaR
+                # data_resampled = prediction_df.iloc[::60, :]
+                # log_returns = data_resampled.pct_change()
+                # VaR_95 = log_returns.quantile(0.005, interpolation='lower')
+                #
+                # stock_list = []
+                #
+                # if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
+                #     stock_list = predict_stocks_morning(prediction_df, Shift.MORNING)
+                # elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
+                #     stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
 
-                stock_list = []
-
-                if STOP_BUYING_TIME_MORNING > current_time > START_BUYING_TIME_MORNING:
-                    stock_list = predict_stocks_morning(prediction_df, Shift.MORNING)
-                elif STOP_BUYING_TIME_EVENING > current_time > START_BUYING_TIME_EVENING:
-                    stock_list = predict_stocks_evening(prediction_df, Shift.EVENING)
-
-                predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
-
+                # predicted_stocks = list(VaR_95[stock_list].sort_values(ascending=False).index)
+                predicted_stocks = list(prediction_df.columns)
                 selected_long_stocks = [st[:-3] for st in predicted_stocks]
 
                 logger.info(f"chosen long: {selected_long_stocks}")
