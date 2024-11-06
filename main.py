@@ -94,11 +94,11 @@ async def train():
         _ = kite_context.ltp("NSE:INFY")
     except InputException:
         return {"message": "Kindly login first"}
-    obtained_stock_list = await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
-    logger.info(obtained_stock_list)
-    logger.info(len([f"{st}.NS" for st in obtained_stock_list if '-BE' not in st]))
 
-    def training():
+    async def training():
+        obtained_stock_list = await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
+        obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
+        logger.info(obtained_stock_list)
         train_model(obtained_stock_list, shift=Shift.MORNING)
         train_model(obtained_stock_list, shift=Shift.EVENING)
 
@@ -124,10 +124,12 @@ async def load_financials():
 
     async def load():
         obtained_stock_list = await get_correct_symbol(lower_price=STOCK_LOWER_PRICE, higher_price=STOCK_UPPER_PRICE)
+        obtained_stock_list = [st for st in obtained_stock_list if '-BE' not in st]
+        logger.info(obtained_stock_list)
         price_df = get_price_df(obtained_stock_list)
         logger.info(price_df)
 
-        eps_df = get_financial_df(obtained_stock_list, 5)
+        eps_df = get_financial_df(obtained_stock_list, 7)
         logger.info(eps_df)
 
     app.add_background_task(load)

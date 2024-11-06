@@ -4,7 +4,7 @@ import re
 import pandas as pd
 
 from constants.global_contexts import kite_context
-from constants.settings import MIS_STOCK_LIST
+from constants.settings import MIS_STOCK_LIST, CURRENT_STOCK_EXCHANGE
 from utils.tracking_components.get_stock_list import filter_penny_stocks
 
 
@@ -16,8 +16,10 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
     :param higher_price: maximum price below which the stocks are chosen
     :return: a list of symbols in correct_format e.g. ['20MICRONS-BE', 'RELIANCE']
     """
+
     if initial_stock_list is None:
-        initial_stock_list = filter_penny_stocks()[['Symbol']]
+        data = filter_penny_stocks()
+        initial_stock_list = data[['Symbol']]
 
     async def get_stocks(sub_list_of_stocks: list):
         """
@@ -27,8 +29,8 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
         :return: dictionary with a key as correct stock symbol and value as current stock price
         """
         dict1 = {}
-        dict1.update(kite_context.ltp([f"NSE:{stock}" for stock in sub_list_of_stocks]))
-        dict1.update(kite_context.ltp([f"NSE:{stock}-BE" for stock in sub_list_of_stocks]))
+        dict1.update(kite_context.ltp([f"{CURRENT_STOCK_EXCHANGE}:{stock}" for stock in sub_list_of_stocks]))
+        dict1.update(kite_context.ltp([f"{CURRENT_STOCK_EXCHANGE}:{stock}-BE" for stock in sub_list_of_stocks]))
         return dict1
 
     # dividing the entire list into a sub blocks of 300 stocks or fewer (for the last one)
@@ -53,7 +55,6 @@ async def get_correct_symbol(lower_price=50, higher_price=800, initial_stock_lis
 
     mis_stocks = pd.read_csv(MIS_STOCK_LIST, skiprows=1, header=1)['Symbol']
     stocks_present = []
-    print(list(mis_stocks))
     for a in list(temp_df.index):
         for b in list(mis_stocks):
             if a == b:

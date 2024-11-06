@@ -54,10 +54,12 @@ END_PROCESS = False
 # stock limit
 STOCK_LOWER_PRICE = 0
 STOCK_UPPER_PRICE = 30
+CURRENT_STOCK_EXCHANGE = "BSE"
+YFINANCE_EXTENSION = "BO"
 
 # stocks name path
-STOCK_NAME_PATH = "/temp/EQUITY_NSE.csv"
-MARKET_CAP_HEADER_NAME = 'Market_Cap'
+STOCK_NAME_PATH = "/temp/EQUITY_BSE.csv"
+MARKET_CAP_HEADER_NAME = 'Market Capitalisation'
 
 
 def get_allocation():

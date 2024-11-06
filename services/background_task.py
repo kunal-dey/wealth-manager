@@ -20,7 +20,7 @@ from constants.enums.shift import Shift
 
 from constants.settings import END_TIME, SLEEP_INTERVAL, get_allocation, end_process, START_TIME, get_max_stocks, \
     set_max_stocks, DEBUG, set_end_process, START_BUYING_TIME_MORNING, STOP_BUYING_TIME_MORNING, START_BUYING_TIME_EVENING, STOP_BUYING_TIME_EVENING, TRAINING_DATE, \
-    EXPECTED_MINIMUM_MONTHLY_RETURN, STOCK_LOWER_PRICE, STOCK_UPPER_PRICE
+    EXPECTED_MINIMUM_MONTHLY_RETURN, STOCK_LOWER_PRICE, STOCK_UPPER_PRICE, CURRENT_STOCK_EXCHANGE, YFINANCE_EXTENSION
 from utils.tracking_components.select_stocks import predict_running_df
 from utils.tracking_components.verify_symbols import get_correct_symbol
 from utils.financials.checks import low_pe, increasing_eps, increasing_sales, increasing_operating_profit
@@ -71,7 +71,7 @@ async def background_task():
     day_based_price_df = None
 
     try:
-        day_based_price_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1y', interval='1d')[['Close', 'High', 'Low', 'Open']]
+        day_based_price_df = yf.download(tickers=[f"{st}.{YFINANCE_EXTENSION}"for st in obtained_stock_list], period='1y', interval='1d')[['Close', 'High', 'Low', 'Open']]
         day_based_price_df = day_based_price_df.ffill().bfill()
         day_based_price_df.index = pd.to_datetime(day_based_price_df.index)
         day_based_price_df = day_based_price_df.loc[:str(TRAINING_DATE.date())]
@@ -86,7 +86,7 @@ async def background_task():
 
     # loading day based price df from yahoo finance
     try:
-        prediction_df = yf.download(tickers=[f"{st}.NS"for st in obtained_stock_list], period='1wk', interval='1m')['Close']
+        prediction_df = yf.download(tickers=[f"{st}.{YFINANCE_EXTENSION}"for st in obtained_stock_list], period='1wk', interval='1m')['Close']
         prediction_df = prediction_df.ffill().bfill()
         prediction_df.index = pd.to_datetime(prediction_df.index)
         prediction_df = prediction_df.loc[:str(TRAINING_DATE.date())]
@@ -189,8 +189,6 @@ async def background_task():
                 low_pe_list.append(pr_stock)
     logger.info(low_pe_list)
 
-    financial_filters = low_pe_list
-
     # increasing_op_list = []
     # for pr_stock in low_pe_list:
     #     if pr_stock in operating_profit_df.columns:
@@ -198,12 +196,14 @@ async def background_task():
     #             increasing_op_list.append(pr_stock)
     # logger.info(increasing_op_list)
     #
-    # increasing_eps_list = []
-    # for pr_stock in increasing_op_list:
-    #     if pr_stock in eps_df.columns:
-    #         if increasing_eps(pr_stock, eps_df):
-    #             increasing_eps_list.append(pr_stock)
-    # logger.info(increasing_eps_list)
+    increasing_eps_list = []
+    for pr_stock in low_pe_list:
+        if pr_stock in eps_df.columns:
+            if increasing_eps(pr_stock, eps_df):
+                increasing_eps_list.append(pr_stock)
+
+    financial_filters = increasing_eps_list
+    logger.info(increasing_eps_list)
     #
     # financial_filters = []
     # for pr_stock in increasing_eps_list:
@@ -305,7 +305,7 @@ async def background_task():
                             set_max_stocks(int(account.available_cash/get_allocation()))
                             if 0 < get_max_stocks() and stock_col not in account.stocks_to_track.keys():
 
-                                raw_stock = StockInfo(stock_col, 'NSE')
+                                raw_stock = StockInfo(stock_col, CURRENT_STOCK_EXCHANGE)
                                 if not DEBUG:
                                     sell_orders: list = raw_stock.get_quote["sell"]
                                     zero_quantity = True
@@ -320,9 +320,9 @@ async def background_task():
                                 # even if it may seem that allocation is reduced when bought, actual change is while adding the
                                 # stock in stocks to track
                                 account.available_cash -= get_allocation()
-                                stock_df = prediction_df[[f"{stock_col}.NS"]]
+                                stock_df = prediction_df[[f"{stock_col}.{YFINANCE_EXTENSION}"]]
                                 stock_df.reset_index(inplace=True, drop=True)
-                                stock_df = stock_df[[f"{stock_col}.NS"]].bfill().ffill()
+                                stock_df = stock_df[[f"{stock_col}.{YFINANCE_EXTENSION}"]].bfill().ffill()
                                 stock_df.columns = ['price']
                                 stock_df.to_csv(f"temp/{stock_col}.csv")
 

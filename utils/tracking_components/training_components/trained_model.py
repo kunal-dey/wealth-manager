@@ -14,6 +14,7 @@ from keras.optimizers import Adam
 from keras.models import Sequential
 
 from constants.enums.shift import Shift
+from constants.settings import YFINANCE_EXTENSION
 from utils.logger import get_logger
 from utils.tracking_components.training_components.data_preparation import training_data
 
@@ -89,7 +90,7 @@ def create_model(hl=2, hn=40, dropout=False, input_dim=None, rate=0.3):
 
 def train_model(stock_list, shift: Shift):
     logger.info(f"data extraction for {shift.value}")
-    data_df = training_data([f"{st}.NS" for st in stock_list if '-BE' not in st], shift)
+    data_df = training_data([f"{st}.{YFINANCE_EXTENSION}" for st in stock_list if '-BE' not in st], shift)
 
     logger.info(f"size: {data_df}")
 

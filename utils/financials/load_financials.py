@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import yfinance as yf
-from constants.settings import TRAINING_DATE
+from constants.settings import TRAINING_DATE, YFINANCE_EXTENSION
 from utils.logger import get_logger
 from logging import Logger
 
@@ -156,7 +156,7 @@ def get_financial_df(stock_list, n):
 def get_price_df(stock_list):
 
     try:
-        yfinance_tickers = [f"{stock}.NS" for stock in stock_list]
+        yfinance_tickers = [f"{stock}.{YFINANCE_EXTENSION}" for stock in stock_list]
         price_df = yf.download(tickers=yfinance_tickers, period='1y', interval='1d')["Close"]
         price_df = price_df.ffill().bfill()
         price_df.index = pd.to_datetime(price_df.index)

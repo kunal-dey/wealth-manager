@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 
 from constants.enums.shift import Shift
-from utils.indicators.kaufman_indicator import kaufman_indicator
 from utils.logger import get_logger
 
 logger: Logger = get_logger(__name__)
@@ -24,7 +23,6 @@ def predict_running_df(day_based_data, model, params):
     def predict_stocks(min_based_data, shift: Shift):
 
         stocks_df = None
-        logger.info(f"x--{min_based_data}")
 
         if shift == Shift.MORNING:
             stocks_df = pd.concat([day_based_data, min_based_data.iloc[0:1]], ignore_index=True)

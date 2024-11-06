@@ -1,6 +1,7 @@
 from datetime import datetime
 import yfinance as yf
 
+from constants.settings import YFINANCE_EXTENSION
 from utils.indicators.kaufman_indicator import kaufman_indicator
 
 
@@ -11,7 +12,7 @@ def filter_stocks(obtained_stock_list):
         if '-BE' not in symbol:
             initial_stock_list.append(symbol)
 
-    monthly_data = yf.download(tickers=[f"{stock}.NS" for stock in initial_stock_list], period='1y', interval='1d',
+    monthly_data = yf.download(tickers=[f"{stock}.{YFINANCE_EXTENSION}" for stock in initial_stock_list], period='1y', interval='1d',
                                show_errors=False)['Open']
 
     monthly_data = monthly_data.bfill().ffill()

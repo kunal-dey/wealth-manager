@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 
 from constants.global_contexts import kite_context
-from constants.settings import DEBUG, GENERATOR_URL
+from constants.settings import DEBUG, GENERATOR_URL, CURRENT_STOCK_EXCHANGE, YFINANCE_EXTENSION
 
 
 async def fetch_current_prices(stock_list):
@@ -24,8 +24,8 @@ async def fetch_current_prices(stock_list):
         :return: dictionary with a key as correct stock symbol and value as current stock price
         """
         dict1 = {}
-        dict1.update(kite_context.ltp([f"NSE:{stock}" for stock in sub_list_of_stocks]))
-        dict1.update(kite_context.ltp([f"NSE:{stock}-BE" for stock in sub_list_of_stocks]))
+        dict1.update(kite_context.ltp([f"{CURRENT_STOCK_EXCHANGE}:{stock}" for stock in sub_list_of_stocks]))
+        dict1.update(kite_context.ltp([f"{CURRENT_STOCK_EXCHANGE}:{stock}-BE" for stock in sub_list_of_stocks]))
         return dict1
 
     if DEBUG:
@@ -47,7 +47,7 @@ async def fetch_current_prices(stock_list):
 
         # one block is one dict of form {'NSE:20MICRONS-BE':234.23,'NSE:RELIANCE':3435.23}
         # hence iterating through one block at a time merging all data into one after removing NSE
-        raw_data = {f"{re.split(':', key)[-1]}.NS": [block[key]['last_price']] for block in data for key in block.keys()}
+        raw_data = {f"{re.split(':', key)[-1]}.{YFINANCE_EXTENSION}": [block[key]['last_price']] for block in data for key in block.keys()}
 
         # converting it into csv and filtering the price range
         temp_df = pd.DataFrame(raw_data)

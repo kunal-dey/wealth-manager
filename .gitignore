@@ -4,6 +4,7 @@ __pycache__/
 constants/kite_credentials.py
 *.csv
 !EQUITY_NSE.csv
+!EQUITY_BSE.csv
 !eps_df.csv
 !price_df.csv
 !sales_df.csv

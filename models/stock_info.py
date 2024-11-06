@@ -14,7 +14,7 @@ from constants.enums.shift import Shift
 from utils.exclude_dates import load_holidays
 
 from constants.global_contexts import kite_context
-from constants.settings import DEBUG, set_end_process, TODAY
+from constants.settings import DEBUG, set_end_process, TODAY, CURRENT_STOCK_EXCHANGE
 from models.db_models.object_models import get_save_to_db, get_delete_from_db, get_update_in_db
 from models.costs.delivery_trading_cost import DeliveryTransactionCost
 from models.costs.intraday_trading_cost import IntradayTransactionCost
@@ -51,7 +51,7 @@ def get_schema():
 @dataclass
 class StockInfo:
     stock_name: str
-    exchange: str = 'NSE'
+    exchange: str = CURRENT_STOCK_EXCHANGE
     wallet: float = field(default=0.0)
     _id: ObjectId = field(default_factory=ObjectId)
     class_name: str = field(default="StockInfo", init=False)
@@ -295,7 +295,7 @@ class StockInfo:
         default_ohlc = ['Open', 'High', 'Low', 'Close']
 
         columns_for_level2 = [col for col in multiindex_columns if
-                              col[1] == f'{self.stock_name}.NS' and col[0] in default_ohlc]
+                              col[1] == f'{self.stock_name}.BO' and col[0] in default_ohlc]
         d = day_based_df[columns_for_level2]
         d.columns = [col[0] for col in columns_for_level2]
 
